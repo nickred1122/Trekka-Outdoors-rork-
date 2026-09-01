@@ -1,0 +1,892 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		XXCC89F456745DF9DB9192XX /* SummitWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = XXB8F3D62153F4A7C89C45XX /* SummitWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		XXAA11F456745DF9DB9192XX /* SummitWatchWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = XXAA01F456745DF9DB9192XX /* SummitWatchWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		105FC58A2E9EAD3200EA8BCF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 105FC5722E9EAD3100EA8BCF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 105FC5792E9EAD3100EA8BCF;
+			remoteInfo = Summit;
+		};
+		105FC5942E9EAD3200EA8BCF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 105FC5722E9EAD3100EA8BCF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 105FC5792E9EAD3100EA8BCF;
+			remoteInfo = Summit;
+		};
+		XX64FF816D8841787A6B13XX /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 105FC5722E9EAD3100EA8BCF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = XX7FC953D009A5D8B924EEXX;
+			remoteInfo = SummitWatch;
+		};
+		XXAA13F456745DF9DB9192XX /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 105FC5722E9EAD3100EA8BCF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = XXAA03F456745DF9DB9192XX;
+			remoteInfo = SummitWatchWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		XX81FF245A222E3682268EXX /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				XXCC89F456745DF9DB9192XX /* SummitWatch.app in Embed Watch Content */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			name = "Embed Watch Content";
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+		};
+		XXAA10F456745DF9DB9192XX /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				XXAA11F456745DF9DB9192XX /* SummitWatchWidget.appex in Embed Foundation Extensions */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			name = "Embed Foundation Extensions";
+			dstPath = "";
+			dstSubfolderSpec = 13;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		105FC57A2E9EAD3100EA8BCF /* Summit.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Summit.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		105FC5892E9EAD3200EA8BCF /* SummitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SummitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		105FC5932E9EAD3200EA8BCF /* SummitUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SummitUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		XXB8F3D62153F4A7C89C45XX /* SummitWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SummitWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		XXAA01F456745DF9DB9192XX /* SummitWatchWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SummitWatchWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		105FC57C2E9EAD3100EA8BCF /* Summit */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Summit;
+			sourceTree = "<group>";
+		};
+		105FC58C2E9EAD3200EA8BCF /* SummitTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SummitTests;
+			sourceTree = "<group>";
+		};
+		105FC5962E9EAD3200EA8BCF /* SummitUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SummitUITests;
+			sourceTree = "<group>";
+		};
+		XXAEE2D029D76490FB6134XX /* SummitWatch */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SummitWatch;
+			sourceTree = "<group>";
+		};
+		XXAA02F456745DF9DB9192XX /* SummitWatchWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SummitWatchWidget;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		105FC5772E9EAD3100EA8BCF /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		105FC5862E9EAD3200EA8BCF /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		105FC5902E9EAD3200EA8BCF /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		XXF3170AE4BE0C5130A7F1XX /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		XXAA05F456745DF9DB9192XX /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		105FC5712E9EAD3100EA8BCF = {
+			isa = PBXGroup;
+			children = (
+				105FC57C2E9EAD3100EA8BCF /* Summit */,
+				105FC58C2E9EAD3200EA8BCF /* SummitTests */,
+				105FC5962E9EAD3200EA8BCF /* SummitUITests */,
+				105FC57B2E9EAD3100EA8BCF /* Products */,
+				XXAEE2D029D76490FB6134XX /* SummitWatch */,
+				XXAA02F456745DF9DB9192XX /* SummitWatchWidget */,
+			);
+			sourceTree = "<group>";
+		};
+		105FC57B2E9EAD3100EA8BCF /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				105FC57A2E9EAD3100EA8BCF /* Summit.app */,
+				105FC5892E9EAD3200EA8BCF /* SummitTests.xctest */,
+				105FC5932E9EAD3200EA8BCF /* SummitUITests.xctest */,
+				XXB8F3D62153F4A7C89C45XX /* SummitWatch.app */,
+				XXAA01F456745DF9DB9192XX /* SummitWatchWidget.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		105FC5792E9EAD3100EA8BCF /* Summit */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 105FC59D2E9EAD3200EA8BCF /* Build configuration list for PBXNativeTarget "Summit" */;
+			buildPhases = (
+				105FC5762E9EAD3100EA8BCF /* Sources */,
+				105FC5772E9EAD3100EA8BCF /* Frameworks */,
+				105FC5782E9EAD3100EA8BCF /* Resources */,
+				XX81FF245A222E3682268EXX /* Embed Watch Content */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				XX7B131D903E2E55B41A1BXX /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				105FC57C2E9EAD3100EA8BCF /* Summit */,
+			);
+			name = Summit;
+			packageProductDependencies = (
+			);
+			productName = Summit;
+			productReference = 105FC57A2E9EAD3100EA8BCF /* Summit.app */;
+			productType = "com.apple.product-type.application";
+		};
+		105FC5882E9EAD3200EA8BCF /* SummitTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 105FC5A02E9EAD3200EA8BCF /* Build configuration list for PBXNativeTarget "SummitTests" */;
+			buildPhases = (
+				105FC5852E9EAD3200EA8BCF /* Sources */,
+				105FC5862E9EAD3200EA8BCF /* Frameworks */,
+				105FC5872E9EAD3200EA8BCF /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				105FC58B2E9EAD3200EA8BCF /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				105FC58C2E9EAD3200EA8BCF /* SummitTests */,
+			);
+			name = SummitTests;
+			packageProductDependencies = (
+			);
+			productName = SummitTests;
+			productReference = 105FC5892E9EAD3200EA8BCF /* SummitTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		105FC5922E9EAD3200EA8BCF /* SummitUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 105FC5A32E9EAD3200EA8BCF /* Build configuration list for PBXNativeTarget "SummitUITests" */;
+			buildPhases = (
+				105FC58F2E9EAD3200EA8BCF /* Sources */,
+				105FC5902E9EAD3200EA8BCF /* Frameworks */,
+				105FC5912E9EAD3200EA8BCF /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				105FC5952E9EAD3200EA8BCF /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				105FC5962E9EAD3200EA8BCF /* SummitUITests */,
+			);
+			name = SummitUITests;
+			packageProductDependencies = (
+			);
+			productName = SummitUITests;
+			productReference = 105FC5932E9EAD3200EA8BCF /* SummitUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		XX7FC953D009A5D8B924EEXX /* SummitWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = XX5B7544A524582D19956CXX /* Build configuration list for PBXNativeTarget "SummitWatch" */;
+			buildPhases = (
+				XX235E2DE7AC6334704F06XX /* Sources */,
+				XXF3170AE4BE0C5130A7F1XX /* Frameworks */,
+				XX70C5FED694D4346E6CF3XX /* Resources */,
+				XXAA10F456745DF9DB9192XX /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				XXAA12F456745DF9DB9192XX /* PBXTargetDependency */,
+			);
+			name = SummitWatch;
+			productName = SummitWatch;
+			productReference = XXB8F3D62153F4A7C89C45XX /* SummitWatch.app */;
+			productType = "com.apple.product-type.application";
+			fileSystemSynchronizedGroups = (
+				XXAEE2D029D76490FB6134XX /* SummitWatch */,
+			);
+		};
+		XXAA03F456745DF9DB9192XX /* SummitWatchWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = XXAA07F456745DF9DB9192XX /* Build configuration list for PBXNativeTarget "SummitWatchWidget" */;
+			buildPhases = (
+				XXAA04F456745DF9DB9192XX /* Sources */,
+				XXAA05F456745DF9DB9192XX /* Frameworks */,
+				XXAA06F456745DF9DB9192XX /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SummitWatchWidget;
+			productName = SummitWatchWidget;
+			productReference = XXAA01F456745DF9DB9192XX /* SummitWatchWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+			fileSystemSynchronizedGroups = (
+				XXAA02F456745DF9DB9192XX /* SummitWatchWidget */,
+			);
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		105FC5722E9EAD3100EA8BCF /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2600;
+				LastUpgradeCheck = 2600;
+				TargetAttributes = {
+					105FC5792E9EAD3100EA8BCF = {
+						CreatedOnToolsVersion = 26.0;
+					};
+					105FC5882E9EAD3200EA8BCF = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = 105FC5792E9EAD3100EA8BCF;
+					};
+					105FC5922E9EAD3200EA8BCF = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = 105FC5792E9EAD3100EA8BCF;
+					};
+				};
+			};
+			buildConfigurationList = 105FC5752E9EAD3100EA8BCF /* Build configuration list for PBXProject "Summit" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 105FC5712E9EAD3100EA8BCF;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 105FC57B2E9EAD3100EA8BCF /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				105FC5792E9EAD3100EA8BCF /* Summit */,
+				105FC5882E9EAD3200EA8BCF /* SummitTests */,
+				105FC5922E9EAD3200EA8BCF /* SummitUITests */,
+				XX7FC953D009A5D8B924EEXX /* SummitWatch */,
+				XXAA03F456745DF9DB9192XX /* SummitWatchWidget */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		105FC5782E9EAD3100EA8BCF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		105FC5872E9EAD3200EA8BCF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		105FC5912E9EAD3200EA8BCF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		XX70C5FED694D4346E6CF3XX /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		XXAA06F456745DF9DB9192XX /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		105FC5762E9EAD3100EA8BCF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		105FC5852E9EAD3200EA8BCF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		105FC58F2E9EAD3200EA8BCF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		XX235E2DE7AC6334704F06XX /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		XXAA04F456745DF9DB9192XX /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		105FC58B2E9EAD3200EA8BCF /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 105FC5792E9EAD3100EA8BCF /* Summit */;
+			targetProxy = 105FC58A2E9EAD3200EA8BCF /* PBXContainerItemProxy */;
+		};
+		105FC5952E9EAD3200EA8BCF /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 105FC5792E9EAD3100EA8BCF /* Summit */;
+			targetProxy = 105FC5942E9EAD3200EA8BCF /* PBXContainerItemProxy */;
+		};
+		XX7B131D903E2E55B41A1BXX /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = XX7FC953D009A5D8B924EEXX /* SummitWatch */;
+			targetProxy = XX64FF816D8841787A6B13XX /* PBXContainerItemProxy */;
+		};
+		XXAA12F456745DF9DB9192XX /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = XXAA03F456745DF9DB9192XX /* SummitWatchWidget */;
+			targetProxy = XXAA13F456745DF9DB9192XX /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		105FC59B2E9EAD3200EA8BCF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		105FC59C2E9EAD3200EA8BCF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		105FC59E2E9EAD3200EA8BCF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Summit/Summit.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Trekka Outdoors";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Trekka Outdoors reads your workouts, heart rate, HRV, sleep and energy to build your training readiness and load insights.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Trekka Outdoors saves the workouts you record so they appear alongside your other activity in Health.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Trekka Outdoors uses your location to record your route, pace and elevation during a workout.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Trekka Outdoors uses motion data to improve distance and elevation accuracy while you train.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.eeq1re3rqvs8qh5xs7zq8;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		105FC59F2E9EAD3200EA8BCF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Summit/Summit.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Trekka Outdoors";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Trekka Outdoors reads your workouts, heart rate, HRV, sleep and energy to build your training readiness and load insights.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Trekka Outdoors saves the workouts you record so they appear alongside your other activity in Health.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Trekka Outdoors uses your location to record your route, pace and elevation during a workout.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Trekka Outdoors uses motion data to improve distance and elevation accuracy while you train.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.eeq1re3rqvs8qh5xs7zq8;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		105FC5A12E9EAD3200EA8BCF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.eeq1re3rqvs8qh5xs7zq8.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Summit.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Summit";
+			};
+			name = Debug;
+		};
+		105FC5A22E9EAD3200EA8BCF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.eeq1re3rqvs8qh5xs7zq8.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Summit.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Summit";
+			};
+			name = Release;
+		};
+		105FC5A42E9EAD3200EA8BCF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.eeq1re3rqvs8qh5xs7zq8.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Summit;
+			};
+			name = Debug;
+		};
+		105FC5A52E9EAD3200EA8BCF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.eeq1re3rqvs8qh5xs7zq8.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Summit;
+			};
+			name = Release;
+		};
+		XX4CFC72C0926A8B9D6CE8XX /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SummitWatch/SummitWatch.entitlements;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Trekka Outdoors reads your heart rate and recovery data to track workouts and score your readiness.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Trekka Outdoors saves your recorded workouts to the Health app.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Trekka Outdoors uses GPS to record your route, distance and elevation while you train.";
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.eeq1re3rqvs8qh5xs7zq8.summitwatch;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				GENERATE_INFOPLIST_FILE = YES;
+				SWIFT_VERSION = 5.0;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				MARKETING_VERSION = 1.0.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				TARGETED_DEVICE_FAMILY = 4;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				INFOPLIST_KEY_CFBundleDisplayName = Trekka;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				ENABLE_PREVIEWS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				INFOPLIST_KEY_WKApplication = YES;
+				INFOPLIST_KEY_WKBackgroundModes = "workout-processing";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = app.rork.eeq1re3rqvs8qh5xs7zq8;
+			};
+			name = Release;
+		};
+		XX81CDB736E4B620CC1AD9XX /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SummitWatch/SummitWatch.entitlements;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Trekka Outdoors reads your heart rate and recovery data to track workouts and score your readiness.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Trekka Outdoors saves your recorded workouts to the Health app.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Trekka Outdoors uses GPS to record your route, distance and elevation while you train.";
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.eeq1re3rqvs8qh5xs7zq8.summitwatch;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				GENERATE_INFOPLIST_FILE = YES;
+				SWIFT_VERSION = 5.0;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				MARKETING_VERSION = 1.0.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				TARGETED_DEVICE_FAMILY = 4;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				INFOPLIST_KEY_CFBundleDisplayName = Trekka;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				ENABLE_PREVIEWS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				INFOPLIST_KEY_WKApplication = YES;
+				INFOPLIST_KEY_WKBackgroundModes = "workout-processing";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = app.rork.eeq1re3rqvs8qh5xs7zq8;
+			};
+			name = Debug;
+		};
+		XXAA08F456745DF9DB9192XX /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SummitWatchWidget/SummitWatchWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/SummitWatchWidget-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Trekka Power";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.eeq1re3rqvs8qh5xs7zq8.summitwatch.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Debug;
+		};
+		XXAA09F456745DF9DB9192XX /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SummitWatchWidget/SummitWatchWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/SummitWatchWidget-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Trekka Power";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.eeq1re3rqvs8qh5xs7zq8.summitwatch.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		105FC5752E9EAD3100EA8BCF /* Build configuration list for PBXProject "Summit" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				105FC59B2E9EAD3200EA8BCF /* Debug */,
+				105FC59C2E9EAD3200EA8BCF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		105FC59D2E9EAD3200EA8BCF /* Build configuration list for PBXNativeTarget "Summit" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				105FC59E2E9EAD3200EA8BCF /* Debug */,
+				105FC59F2E9EAD3200EA8BCF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		105FC5A02E9EAD3200EA8BCF /* Build configuration list for PBXNativeTarget "SummitTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				105FC5A12E9EAD3200EA8BCF /* Debug */,
+				105FC5A22E9EAD3200EA8BCF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		105FC5A32E9EAD3200EA8BCF /* Build configuration list for PBXNativeTarget "SummitUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				105FC5A42E9EAD3200EA8BCF /* Debug */,
+				105FC5A52E9EAD3200EA8BCF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		XX5B7544A524582D19956CXX /* Build configuration list for PBXNativeTarget "SummitWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				XX81CDB736E4B620CC1AD9XX /* Debug */,
+				XX4CFC72C0926A8B9D6CE8XX /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		XXAA07F456745DF9DB9192XX /* Build configuration list for PBXNativeTarget "SummitWatchWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				XXAA08F456745DF9DB9192XX /* Debug */,
+				XXAA09F456745DF9DB9192XX /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 105FC5722E9EAD3100EA8BCF /* Project object */;
+}
