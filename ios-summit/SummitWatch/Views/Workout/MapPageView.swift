@@ -51,17 +51,6 @@ struct MapPageView: View {
     /// the map was being turned past — the Crown scrolled the pager underneath
     /// instead of zooming, which reads on the wrist as zoom being broken.
     @FocusState private var isCrownFocused: Bool
-    /// The map's own focus scope.
-    ///
-    /// Writing `true` into a `@FocusState` is a request, and watchOS declines it
-    /// whenever something else already holds system focus — silently, with no
-    /// way to tell from the app that it was refused. Three attempts at claiming
-    /// the Crown that way all failed on the wrist for exactly this reason. A
-    /// scope plus `resetFocus` is the imperative form: it tells watchOS to run
-    /// focus again inside this region and hand it to the preferred view, rather
-    /// than politely asking for it.
-    @Namespace private var crownScope
-    @Environment(\.resetFocus) private var resetFocus
     /// The running claim, so a fresh one replaces it rather than racing it.
     @State private var crownClaim: Task<Void, Never>?
     /// Bumped on every Crown step, so the scale chip can appear while zooming
@@ -105,10 +94,7 @@ struct MapPageView: View {
     }
 
     var body: some View {
-        // The scope has to wrap the focusable view rather than being the
-        // focusable view, so `resetFocus` has a region to re-run focus inside.
         mapPage
-            .focusScope(crownScope)
             // Claimed as the map appears, and re-claimed after every tap: a
             // Button takes focus with it, and a map whose Crown works only until
             // you touch something is worse than one that never worked.
@@ -145,15 +131,18 @@ struct MapPageView: View {
         }
         .focusable(true)
         .focused($isCrownFocused)
-        // Names this as the view focus should land on whenever the scope is
-        // reset — the map, never one of the buttons floating over it.
-        .prefersDefaultFocus(true, in: crownScope)
         .digitalCrownRotation(
             $zoomExponent,
             from: Self.minimumExponent,
             through: Self.maximumExponent,
             by: Self.exponentStep,
-            sensitivity: .medium,
+            // Sensitivity is defined per whole unit of the bound value, and a
+            // unit here is a doubling of the ground shown — the entire range
+            // from a street to a mountainside is only about 7.6 of them. At
+            // medium that is some six full turns of the Crown end to end, so a
+            // normal flick moved the scale by an amount too small to see and
+            // the map looked unresponsive even when it was listening.
+            sensitivity: .high,
             isContinuous: false,
             isHapticFeedbackEnabled: true
         )
@@ -169,18 +158,6 @@ struct MapPageView: View {
         }
     }
 
-    /// Takes the Crown for the map, and keeps asking until it sticks.
-    ///
-    /// One claim on appear is not enough. The map slides in over about 0.28s,
-    /// and SwiftUI keeps the outgoing page carousel mounted for the whole of
-    /// that transition — still holding the Crown. A claim made in that window is
-    /// handed straight back, and by the time the carousel finally leaves,
-    /// nothing is asking for the Crown any more: the map ends up focusable but
-    /// unfocused, which is why panning worked and zooming did nothing.
-    ///
-    /// So the claim is re-asserted across a window that outlasts the transition.
-    /// It stops early the moment focus is actually held, and the same retry
-    /// covers focus lost to a button tap.
     /// Moves the scale by one deliberate step.
     ///
     /// Negative closes in, positive pulls back — the exponent counts ground
@@ -220,20 +197,40 @@ struct MapPageView: View {
         .padding(2)
     }
 
+    /// Takes the Crown for the map, and keeps asking until it sticks.
+    ///
+    /// One claim on appear is not enough. The map slides in over about 0.28s,
+    /// and SwiftUI keeps the outgoing page carousel mounted for the whole of
+    /// that transition — still holding the Crown. A claim made in that window is
+    /// handed straight back, and by the time the carousel finally leaves,
+    /// nothing is asking for the Crown any more: the map ends up focusable but
+    /// unfocused, which is why panning worked and zooming did nothing.
+    ///
+    /// The claim is therefore re-asserted across a window that outlasts the
+    /// transition, and each attempt drops focus before asking for it again.
+    /// That second part is the one that was missing: `@FocusState` is a value,
+    /// not a command, so writing `true` into a property that already reads
+    /// `true` changes nothing and SwiftUI never re-runs focus. Because a
+    /// refused claim leaves the property stuck at `true`, every retry after the
+    /// first was a silent no-op — the loop looked like eight attempts and was
+    /// really only ever one.
     private func claimCrown() {
         crownClaim?.cancel()
-        isCrownFocused = true
-        resetFocus(in: crownScope)
+        let tokenAtStart = zoomToken
         crownClaim = Task {
-            for _ in 0..<8 {
-                try? await Task.sleep(for: .milliseconds(120))
+            for attempt in 0..<6 {
                 guard !Task.isCancelled else { return }
-                if isCrownFocused { return }
+                // The Crown has answered, so the claim landed. Stop, rather
+                // than dropping focus underneath a turn already in progress.
+                if zoomToken != tokenAtStart { return }
+
+                if attempt > 0 {
+                    isCrownFocused = false
+                    try? await Task.sleep(for: .milliseconds(20))
+                    guard !Task.isCancelled else { return }
+                }
                 isCrownFocused = true
-                // The part the previous attempts were missing: forcing focus to
-                // be worked out again, rather than asking for it and being
-                // quietly refused.
-                resetFocus(in: crownScope)
+                try? await Task.sleep(for: .milliseconds(attempt == 0 ? 80 : 150))
             }
         }
     }
