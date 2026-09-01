@@ -2,14 +2,20 @@ import SwiftUI
 
 /// Design the Apple Watch workout screens from the phone, with a live
 /// wrist-shaped preview of exactly what you will see mid-effort.
+///
+/// This screen does one job — arrange the pages for one activity — and the
+/// preview, the activity and the page list are the only things on it. Everything
+/// that is set once and then left alone (colours, alerts, battery, the state of
+/// the link) sits a tap away instead of stacked underneath, because those
+/// settings were pushing the actual page list so far down the screen that the
+/// thing this screen is for was the hardest part of it to reach.
 struct WatchSetupView: View {
     @Environment(WatchLayoutStore.self) private var layout
-    @Environment(\.dismiss) private var dismiss
 
     @State private var sport: WatchSportProfile = .trailRun
-    @State private var family: WatchSportFamily = .run
     @State private var previewIndex = 0
     @State private var isAddingPage = false
+    @State private var isChoosingSport = false
     @State private var showsResetConfirmation = false
 
     private var pages: [WatchPage] {
@@ -26,11 +32,8 @@ struct WatchSetupView: View {
             previewSection
             sportSection
             pagesSection
-            optionsSection
-            appearanceSection
-            powerSection
-            mirrorSection
-            deliverySection
+            settingsSection
+            sendSection
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
@@ -46,6 +49,11 @@ struct WatchSetupView: View {
             }
             .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $isChoosingSport) {
+            NavigationStack {
+                WatchSportPickerView(selection: $sport)
+            }
+        }
         .confirmationDialog("Reset \(sport.title) screens?", isPresented: $showsResetConfirmation, titleVisibility: .visible) {
             Button("Reset to default", role: .destructive) {
                 layout.resetPages(for: sport)
@@ -53,11 +61,7 @@ struct WatchSetupView: View {
             }
             Button("Cancel", role: .cancel) {}
         }
-        .onChange(of: sport) { _, newValue in
-            previewIndex = 0
-            family = newValue.family
-        }
-        .onAppear { family = sport.family }
+        .onChange(of: sport) { _, _ in previewIndex = 0 }
     }
 
     // MARK: - Preview
@@ -107,85 +111,46 @@ struct WatchSetupView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
             .listRowBackground(Color.clear)
-        } footer: {
-            Text("Swipe through these pages on the watch during a workout. The controls page — lap, pause, end — always comes first.")
         }
     }
 
-    // MARK: - Sport
+    // MARK: - Activity
 
-    /// Family first, then the sports inside it — with fifty-odd activities a
-    /// single row would be an endless scroll.
+    /// One row, not two scrollers. Which activity you are editing is a single
+    /// fact, so it reads as a single line — and the fifty-odd choices behind it
+    /// live in a searchable list where that many entries belong.
     private var sportSection: some View {
         Section {
-            ScrollView(.horizontal) {
-                HStack(spacing: 6) {
-                    ForEach(WatchSportFamily.allCases) { candidate in
-                        Button {
-                            withAnimation(.snappy(duration: 0.2)) { family = candidate }
-                        } label: {
-                            Text(candidate.title)
-                                .font(.system(size: 12, weight: .semibold))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 7)
-                                .foregroundStyle(candidate == family ? candidate.tint : Theme.textPrimary.opacity(0.65))
-                                .background(
-                                    candidate == family ? candidate.tint.opacity(0.16) : Theme.surfaceRaised,
-                                    in: .capsule
-                                )
-                                .overlay {
-                                    Capsule().strokeBorder(
-                                        candidate == family ? candidate.tint : Color.clear,
-                                        lineWidth: 1
-                                    )
-                                }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.vertical, 4)
-            }
-            .scrollIndicators(.hidden)
-            .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 0, trailing: 0))
+            Button {
+                isChoosingSport = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: sport.symbol)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(sport.tint)
+                        .frame(width: 32, height: 32)
+                        .background(sport.tint.opacity(0.16), in: .circle)
 
-            ScrollView(.horizontal) {
-                HStack(spacing: 8) {
-                    ForEach(family.sports) { candidate in
-                        Button {
-                            withAnimation(.snappy(duration: 0.2)) { sport = candidate }
-                        } label: {
-                            Text(candidate.title)
-                                .font(.system(size: 11, weight: .semibold))
-                                .multilineTextAlignment(.center)
-                                .lineLimit(2)
-                                .minimumScaleFactor(0.8)
-                                .padding(.horizontal, 6)
-                                .frame(width: 72, height: 56)
-                            .foregroundStyle(candidate == sport ? Theme.canvas : Theme.textPrimary.opacity(0.75))
-                            .background(
-                                candidate == sport ? candidate.tint : Theme.surfaceRaised,
-                                in: .rect(cornerRadius: 12)
-                            )
-                            .overlay(alignment: .topTrailing) {
-                                if layout.isCustomized(candidate) {
-                                    Circle()
-                                        .fill(candidate == sport ? Theme.canvas : Theme.accent)
-                                        .frame(width: 5, height: 5)
-                                        .padding(5)
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(sport.title)
+                            .font(.system(.body, weight: .semibold))
+                            .foregroundStyle(Theme.textPrimary)
+                        Text(layout.isCustomized(sport) ? "Your own screens" : "Default screens")
+                            .font(.caption2)
+                            .foregroundStyle(Theme.textPrimary.opacity(0.55))
                     }
+
+                    Spacer(minLength: 0)
+
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary.opacity(0.4))
                 }
-                .padding(.vertical, 4)
+                .contentShape(.rect)
             }
-            .scrollIndicators(.hidden)
-            .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 4, trailing: 0))
+            .buttonStyle(.plain)
         } header: {
-            Text("Activity")
-        } footer: {
-            Text("\(family.title) · \(family.summary). Editing \(sport.title).")
+            Text("Editing")
         }
     }
 
@@ -193,7 +158,7 @@ struct WatchSetupView: View {
 
     private var pagesSection: some View {
         Section {
-            ForEach(Array(pages.enumerated()), id: \.element.id) { index, page in
+            ForEach(Array(pages.enumerated()), id: \.element.id) { _, page in
                 NavigationLink {
                     WatchPageEditorView(sport: sport, pageID: page.id)
                 } label: {
@@ -231,13 +196,13 @@ struct WatchSetupView: View {
                 Button(role: .destructive) {
                     showsResetConfirmation = true
                 } label: {
-                    Label("Reset \(sport.title) to default", systemImage: "arrow.counterclockwise")
+                    Label("Reset to default", systemImage: "arrow.counterclockwise")
                 }
             }
         } header: {
-            Text("Pages · \(sport.title)")
+            Text("Pages")
         } footer: {
-            Text("Drag to reorder with Edit, swipe left to delete, swipe right to hide a page without losing its setup.")
+            Text("Swipe through these on the watch during a workout — the controls page always comes first. Drag to reorder with Edit, swipe left to delete, swipe right to hide a page without losing its setup.")
         }
     }
 
@@ -269,288 +234,127 @@ struct WatchSetupView: View {
         .contentShape(.rect)
     }
 
-    // MARK: - Options
+    // MARK: - Settings
 
-    @ViewBuilder
-    private var optionsSection: some View {
-        @Bindable var bindableLayout = layout
-
-        Section("Workout behaviour") {
-            Toggle("Auto lap", isOn: $bindableLayout.isAutoLapEnabled)
-            if layout.isAutoLapEnabled {
-                Stepper(value: $bindableLayout.autoLapKilometres, in: 0.5...10, step: 0.5) {
-                    HStack {
-                        Text("Every")
-                        Spacer()
-                        Text("\(layout.autoLapKilometres, specifier: "%.1f") \(layout.unitSystem.distanceUnit)")
-                            .font(.metric(15))
-                            .foregroundStyle(Theme.accent)
-                    }
-                }
-            }
-            Toggle("Auto pause", isOn: $bindableLayout.isAutoPauseEnabled)
-            Toggle("Haptic alerts", isOn: $bindableLayout.usesHapticAlerts)
-            Toggle("Satellite map", isOn: $bindableLayout.prefersHybridMap)
-            Toggle("Always-on metrics", isOn: $bindableLayout.keepsScreenOn)
-
-            Stepper(value: $bindableLayout.maxHeartRate, in: 140...220) {
-                HStack {
-                    Text("Max heart rate")
-                    Spacer()
-                    Text("\(layout.maxHeartRate) bpm")
-                        .font(.metric(15))
-                        .foregroundStyle(Theme.danger)
-                }
-            }
-        }
-    }
-
-    // MARK: - Appearance
-
-    /// Line colours and metric type, set here because a phone is a far easier
-    /// place to make a visual choice than a watch — then carried to the wrist in
-    /// the same document as the pages.
-    @ViewBuilder
-    private var appearanceSection: some View {
-        @Bindable var bindableLayout = layout
-
+    /// The four things that used to be twenty-odd controls stacked below the
+    /// page list. Each row carries what it is currently set to, so the settings
+    /// can still be read at a glance without being operated at a glance.
+    private var settingsSection: some View {
         Section {
-            trailColorRow(
-                title: "Course line",
-                caption: "The route you planned",
-                selection: $bindableLayout.routeTrailColor
-            )
-            trailColorRow(
-                title: "Your trail",
-                caption: "The breadcrumb behind you",
-                selection: $bindableLayout.breadcrumbTrailColor
-            )
-
-            Picker("Metric typeface", selection: $bindableLayout.metricTypeface) {
-                Text("Rounded").tag("rounded")
-                Text("Instrument").tag("instrument")
-                Text("Classic").tag("classic")
-                Text("Serif").tag("serif")
+            NavigationLink {
+                WatchAppearanceView()
+            } label: {
+                settingRow(
+                    "Appearance",
+                    symbol: "paintpalette.fill",
+                    tint: Theme.accent,
+                    detail: appearanceSummary
+                )
             }
 
-            Picker("Metric weight", selection: $bindableLayout.metricWeight) {
-                Text("Light").tag("light")
-                Text("Standard").tag("standard")
-                Text("Heavy").tag("heavy")
+            NavigationLink {
+                WatchBehaviourView()
+            } label: {
+                settingRow(
+                    "During a workout",
+                    symbol: "figure.run",
+                    tint: Theme.highlight,
+                    detail: behaviourSummary
+                )
             }
 
-            Picker("Readout colour", selection: $bindableLayout.fieldTint) {
-                Text("Automatic").tag("auto")
-                Text("Plain white").tag("mono")
-                Text("Orange").tag("orange")
-                Text("Amber").tag("amber")
-                Text("Lime").tag("lime")
-                Text("Cyan").tag("cyan")
-                Text("Blue").tag("blue")
-                Text("Violet").tag("violet")
-                Text("Magenta").tag("magenta")
+            NavigationLink {
+                WatchPowerView()
+            } label: {
+                settingRow(
+                    "Battery",
+                    symbol: "battery.100percent.bolt",
+                    tint: Theme.positive,
+                    detail: powerSummary
+                )
+            }
+
+            NavigationLink {
+                WatchSyncView()
+            } label: {
+                settingRow(
+                    "Sync",
+                    symbol: "applewatch.radiowaves.left.and.right",
+                    tint: Theme.textPrimary.opacity(0.7),
+                    detail: syncSummary
+                )
             }
         } header: {
-            Text("Colours & type")
+            Text("Watch settings")
         } footer: {
-            Text("Line colours apply to maps on both devices. Typeface and readout colour apply to the watch's metric screens.")
+            Text("These apply to every activity, not just \(sport.title).")
         }
     }
 
-    /// A colour choice shown as colour, not as a list of names.
-    private func trailColorRow(
-        title: String,
-        caption: String,
-        selection: Binding<TrailColor>
+    private func settingRow(
+        _ title: String,
+        symbol: String,
+        tint: Color,
+        detail: String
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .foregroundStyle(Theme.textPrimary)
-                    Text(caption)
-                        .font(.caption)
-                        .foregroundStyle(Theme.textPrimary.opacity(0.55))
-                }
-                Spacer()
-                Text(selection.wrappedValue.title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(selection.wrappedValue.color)
-            }
-
-            HStack(spacing: 10) {
-                ForEach(TrailColor.allCases) { option in
-                    Button {
-                        selection.wrappedValue = option
-                    } label: {
-                        Circle()
-                            .fill(option.color)
-                            .frame(width: 26, height: 26)
-                            .overlay {
-                                Circle()
-                                    .strokeBorder(
-                                        Theme.textPrimary,
-                                        lineWidth: selection.wrappedValue == option ? 2.5 : 0
-                                    )
-                                    .padding(-3)
-                            }
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(option.title)
-                    .accessibilityAddTraits(
-                        selection.wrappedValue == option ? [.isSelected, .isButton] : .isButton
-                    )
-                }
-            }
-            .animation(.snappy(duration: 0.2), value: selection.wrappedValue)
-        }
-        .padding(.vertical, 4)
-    }
-
-    // MARK: - Power
-
-    /// Power saver, set up here and applied on the wrist.
-    private var powerSection: some View {
-        @Bindable var bindableLayout = layout
-
-        return Section {
-            Toggle(isOn: $bindableLayout.isPowerSaverEnabled) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Power saver")
-                    Text("Start every watch workout in low power")
-                        .font(.caption2)
-                        .foregroundStyle(Theme.textPrimary.opacity(0.55))
-                }
-            }
-
-            // No hours are quoted here on purpose. Only the watch can watch its
-            // own battery, and that measurement never reaches this phone — so
-            // anything printed here would be a constant pretending to be a
-            // forecast, and wrong by hours on a cold day.
-            Label(
-                "Your watch measures its own battery drain during workouts and shows the hours it has left under Power on the wrist.",
-                systemImage: "battery.100percent.bolt"
-            )
-            .font(.caption)
-            .foregroundStyle(Theme.textPrimary.opacity(0.6))
-
-            Stepper(value: $bindableLayout.powerSaverThreshold, in: 0...50, step: 5) {
-                HStack {
-                    Text("Switch on at")
-                    Spacer()
-                    Text(layout.powerSaverThreshold == 0 ? "Off" : "\(layout.powerSaverThreshold)%")
-                        .font(.metric(15))
-                        .foregroundStyle(layout.powerSaverThreshold == 0 ? Theme.textPrimary.opacity(0.5) : Theme.positive)
-                }
-            }
-
-            Toggle(isOn: $bindableLayout.usesWaterLock) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Auto water lock")
-                    Text("Locks the watch screen for swims")
-                        .font(.caption2)
-                        .foregroundStyle(Theme.textPrimary.opacity(0.55))
-                }
-            }
-
-            Toggle(isOn: $bindableLayout.confirmsWorkoutEnd) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Confirm before stopping")
-                    Text(layout.confirmsWorkoutEnd
-                         ? "The watch asks before ending a workout"
-                         : "End saves the workout straight away")
-                        .font(.caption2)
-                        .foregroundStyle(Theme.textPrimary.opacity(0.55))
-                }
-            }
-
-            DisclosureGroup("What power saver changes") {
-                ForEach(PowerSaverPlan.changes) { change in
-                    Label {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(change.title)
-                                .font(.system(.subheadline, weight: .semibold))
-                                .foregroundStyle(Theme.textPrimary)
-                            Text(change.detail)
-                                .font(.caption2)
-                                .foregroundStyle(Theme.textPrimary.opacity(0.55))
-                        }
-                    } icon: {
-                        Image(systemName: change.symbol)
-                            .foregroundStyle(Theme.positive)
-                    }
-                    .padding(.vertical, 2)
-                }
-            }
-        } header: {
-            Text("Battery")
-        } footer: {
-            Text("Estimates assume a full charge with GPS recording. Time, distance, elevation and laps are recorded exactly the same in either mode — heart rate is the one thing you trade away.")
-        }
-    }
-
-    private func batteryEstimate(title: String, value: String, tint: Color) -> some View {
-        VStack(spacing: 2) {
-            Text(title.uppercased())
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(Theme.textPrimary.opacity(0.5))
-            Text(value)
-                .font(.metric(24, weight: .bold))
+        HStack(spacing: 12) {
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(tint)
-            Text("of recording")
-                .font(.caption2)
-                .foregroundStyle(Theme.textPrimary.opacity(0.45))
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(Theme.surfaceRaised, in: .rect(cornerRadius: 14))
-    }
+                .frame(width: 26)
 
-    // MARK: - Mirror
-
-    /// Explains the two-way relationship and surfaces the last wrist edit.
-    private var mirrorSection: some View {
-        Section {
-            Label {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Today dashboard mirrored")
-                        .font(.system(.subheadline, weight: .semibold))
-                        .foregroundStyle(Theme.textPrimary)
-                    Text("Your tiles, readiness, zones and history appear on the watch with the same layout.")
-                        .font(.caption2)
-                        .foregroundStyle(Theme.textPrimary.opacity(0.55))
-                }
-            } icon: {
-                Image(systemName: "square.grid.2x2.fill")
-                    .foregroundStyle(Theme.accent)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(.subheadline, weight: .semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                Text(detail)
+                    .font(.caption2)
+                    .foregroundStyle(Theme.textPrimary.opacity(0.5))
+                    .lineLimit(1)
             }
-
-            if let summary = WatchLink.shared.lastWatchEditSummary,
-               let date = WatchLink.shared.lastWatchEditAt {
-                Label {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(summary)
-                            .font(.system(.subheadline, weight: .semibold))
-                            .foregroundStyle(Theme.textPrimary)
-                        Text("Applied here \(date.formatted(date: .omitted, time: .shortened))")
-                            .font(.caption2)
-                            .foregroundStyle(Theme.textPrimary.opacity(0.55))
-                    }
-                } icon: {
-                    Image(systemName: "arrow.down.left.arrow.up.right")
-                        .foregroundStyle(Theme.highlight)
-                }
-            }
-        } header: {
-            Text("Two-way sync")
-        } footer: {
-            Text("Edit on either device. Changes made on the watch — screens, options or dashboard tiles — come straight back to this app.")
         }
     }
 
-    // MARK: - Delivery
+    private var appearanceSummary: String {
+        [
+            MetricTypefaceOption.title(for: layout.metricTypeface),
+            MetricTintOption.title(for: layout.fieldTint),
+            layout.prefersHybridMap ? "Satellite" : "Topographic",
+        ].joined(separator: " · ")
+    }
 
-    private var deliverySection: some View {
+    private var behaviourSummary: String {
+        var parts: [String] = []
+        parts.append(
+            layout.isAutoLapEnabled
+                ? "Auto lap \(layout.autoLapKilometres.formatted(.number.precision(.fractionLength(0...1)))) \(layout.unitSystem.distanceUnit)"
+                : "No auto lap"
+        )
+        if layout.isAutoPauseEnabled { parts.append("Auto pause") }
+        parts.append("\(layout.maxHeartRate) bpm max")
+        return parts.joined(separator: " · ")
+    }
+
+    private var powerSummary: String {
+        if layout.isPowerSaverEnabled { return "Always on low power" }
+        if layout.powerSaverThreshold > 0 { return "Low power at \(layout.powerSaverThreshold)%" }
+        return "Full power"
+    }
+
+    private var syncSummary: String {
+        switch layout.delivery {
+        case .sending: "Sending…"
+        case .delivered(let date): "Sent \(date.formatted(date: .omitted, time: .shortened))"
+        case .failed: "Couldn't send"
+        case .idle: WatchLink.shared.isWatchAppInstalled ? "Changes not sent yet" : "No watch detected"
+        }
+    }
+
+    // MARK: - Send
+
+    /// The one action on this screen, kept where an action belongs: at the end,
+    /// alone, after everything it sends has been decided.
+    private var sendSection: some View {
         Section {
             switch layout.delivery {
             case .sending(let progress):
@@ -560,20 +364,6 @@ struct WatchSetupView: View {
                         .foregroundStyle(Theme.textPrimary)
                     ProgressView(value: progress)
                         .tint(Theme.accent)
-                }
-            case .delivered(let date):
-                Label {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Layout on your watch")
-                            .font(.system(.subheadline, weight: .semibold))
-                            .foregroundStyle(Theme.textPrimary)
-                        Text("Transferred \(date.formatted(date: .omitted, time: .shortened))")
-                            .font(.caption2)
-                            .foregroundStyle(Theme.textPrimary.opacity(0.55))
-                    }
-                } icon: {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Color(red: 0.32, green: 0.85, blue: 0.55))
                 }
             case .failed(let message):
                 VStack(alignment: .leading, spacing: 6) {
@@ -587,120 +377,29 @@ struct WatchSetupView: View {
                         .font(.system(.subheadline, weight: .semibold))
                         .foregroundStyle(Theme.accent)
                 }
-            case .idle:
-                Button {
-                    layout.sendToWatch()
-                } label: {
-                    Label("Send layout to Apple Watch", systemImage: "applewatch.radiowaves.left.and.right")
-                        .font(.system(.subheadline, weight: .semibold))
-                        .foregroundStyle(Theme.accent)
-                }
-            }
-
-            if let workout = WatchLink.shared.lastWorkout {
+            case .delivered(let date):
                 Label {
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Workout received from watch")
+                        Text("On your watch")
                             .font(.system(.subheadline, weight: .semibold))
                             .foregroundStyle(Theme.textPrimary)
-                        Text("\(WatchSportProfile(rawValue: workout.sport)?.title ?? workout.sport) · \(Formatters.compactDuration(workout.duration)) · \(Formatters.distance(workout.distance)) km")
+                        Text("Transferred \(date.formatted(date: .omitted, time: .shortened))")
                             .font(.caption2)
                             .foregroundStyle(Theme.textPrimary.opacity(0.55))
                     }
                 } icon: {
-                    Image(systemName: "arrow.down.heart")
-                        .foregroundStyle(Theme.highlight)
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Theme.positive)
                 }
-            }
-        } footer: {
-            Text(WatchLink.shared.isPaired && WatchLink.shared.isWatchAppInstalled
-                ? "Transfers run over WatchConnectivity. The watch stores the layout itself, so your screens work with the phone left at home."
-                : "No Apple Watch running Trekka detected. Pair your watch, install the app, then send again.")
-        }
-    }
-}
-
-/// Adds a new page to a sport, either a preset data screen or a special page.
-struct AddWatchPageView: View {
-    let sport: WatchSportProfile
-
-    @Environment(WatchLayoutStore.self) private var layout
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        List {
-            Section("Data screens") {
-                ForEach(presets, id: \.name) { preset in
-                    Button {
-                        layout.addPage(.data(preset.fields, layout: preset.layout), to: sport)
-                        dismiss()
-                    } label: {
-                        HStack(spacing: 12) {
-                            WatchLayoutGlyph(layout: preset.layout, tint: sport.tint, isSelected: true)
-                                .frame(width: 30, height: 36)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(preset.name)
-                                    .font(.system(.subheadline, weight: .semibold))
-                                    .foregroundStyle(Theme.textPrimary)
-                                Text(preset.fields.isEmpty ? "Start from nothing" : preset.fields.map(\.title).joined(separator: " · "))
-                                    .font(.caption2)
-                                    .foregroundStyle(Theme.textPrimary.opacity(0.55))
-                                    .lineLimit(2)
-                            }
-                        }
-                    }
-                }
-            }
-
-            Section("Special pages") {
-                ForEach(WatchPageKind.allCases.filter { $0 != .data }) { kind in
-                    Button {
-                        layout.addPage(.page(kind), to: sport)
-                        dismiss()
-                    } label: {
-                        Label {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(kind.title)
-                                    .font(.system(.subheadline, weight: .semibold))
-                                    .foregroundStyle(Theme.textPrimary)
-                                Text(kind.detail)
-                                    .font(.caption2)
-                                    .foregroundStyle(Theme.textPrimary.opacity(0.55))
-                            }
-                        } icon: {
-                            Image(systemName: kind.symbol)
-                                .foregroundStyle(sport.tint)
-                        }
-                    }
+            case .idle:
+                Button {
+                    layout.sendToWatch()
+                } label: {
+                    Label("Send to Apple Watch", systemImage: "applewatch.radiowaves.left.and.right")
+                        .font(.system(.subheadline, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
                 }
             }
         }
-        .listStyle(.insetGrouped)
-        .scrollContentBackground(.hidden)
-        .background(Theme.canvas)
-        .navigationTitle("Add Page")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { dismiss() }
-            }
-        }
-    }
-
-    /// Starting points, each with the shape it is meant to be read in. Every one
-    /// can be rearranged afterwards.
-    private var presets: [(name: String, fields: [WatchMetric], layout: WatchPageLayout?)] {
-        let tempo: WatchMetric = sport.usesPace ? .pace : .speed
-        return [
-            ("Single big number", [tempo], WatchPageLayout(rows: [1])),
-            ("Classic three", [.duration, .distance, tempo], WatchPageLayout(rows: [1, 2])),
-            ("Four up", [.duration, .distance, tempo, .heartRate], WatchPageLayout(rows: [2, 2])),
-            ("One, pair, one", [tempo, .distance, .heartRate, .duration], WatchPageLayout(rows: [1, 2, 1])),
-            ("Climbing", [.grade, .ascent, .altitude, .verticalSpeed], WatchPageLayout(rows: [1, 3])),
-            ("Lap focus", [.lapTime, .lapDistance, .lapPace, .averageHeartRate], WatchPageLayout(rows: [2, 2])),
-            ("Navigation", [.eta, .remainingDistance, .distanceToWaypoint, .nextWaypoint], WatchPageLayout(rows: [1, 2, 1])),
-            ("Everything", [.duration, .distance, tempo, .heartRate, .ascent, .calories], WatchPageLayout(rows: [2, 2, 2])),
-            ("Blank screen", [], nil),
-        ]
     }
 }
