@@ -69,9 +69,10 @@ struct MapPageView: View {
     private static let minimumExponent: Double = log2(minimumSpanMetres)
     private static let maximumExponent: Double = log2(maximumSpanMetres)
     private static let defaultExponent: Double = log2(900)
-    /// About 9% of ground per detent — fine enough to feel continuous, coarse
-    /// enough to cross the whole range without winding the Crown all day.
-    private static let exponentStep: Double = 0.125
+    /// About 19% of ground per detent. Any finer and a normal flick of the
+    /// Crown moves the scale by an amount too small to notice, which reads on
+    /// the wrist as the Crown being dead even when it is working perfectly.
+    private static let exponentStep: Double = 0.25
     /// One tap of the on-screen zoom: about 40% of ground, so the whole range is
     /// a dozen or so taps rather than fifty.
     private static let buttonStep: Double = 0.5
@@ -120,13 +121,46 @@ struct MapPageView: View {
         // every touch — so the pan gesture never saw a single drag and exploring
         // did nothing at all.
         ZStack {
+            // The Crown listens here, on the map and on nothing else.
+            //
+            // It used to listen on the whole stack, chrome included — which put
+            // the chips and the buttons *inside* the focused view. Every Crown
+            // detent showed the scale chip, and showing it rebuilt the content
+            // of the very view that had to keep hold of the Crown. So the first
+            // turn landed, by one step too small to see, and the churn
+            // underneath then dropped the focus and the Crown went dead. Turning
+            // harder only re-triggered the thing that was breaking it, which is
+            // why it felt completely inert rather than merely unreliable.
+            //
+            // The map on its own never changes shape, so there is nothing left
+            // to knock the focus off it.
             mapBody
                 .ignoresSafeArea()
+                .focusable(true)
+                .focused($isCrownFocused)
+                .digitalCrownRotation(
+                    $zoomExponent,
+                    from: Self.minimumExponent,
+                    through: Self.maximumExponent,
+                    by: Self.exponentStep,
+                    // Sensitivity is defined per whole unit of the bound value,
+                    // and a unit here is a doubling of the ground shown — the
+                    // entire range from a street to a mountainside is only about
+                    // 7.6 of them. At medium that is some six full turns of the
+                    // Crown end to end, so a normal flick moved the scale by an
+                    // amount too small to see and the map looked unresponsive
+                    // even when it was listening.
+                    sensitivity: .high,
+                    isContinuous: false,
+                    isHapticFeedbackEnabled: true
+                )
 
             // Chips and buttons keep to the safe area, where the curved corners
             // and the system clock cannot clip them. The layer holding them is
             // transparent to touches, so everywhere the athlete has not actually
-            // aimed at a button still belongs to the map.
+            // aimed at a button still belongs to the map. It is a sibling of the
+            // focus target rather than part of it, so nothing that appears here
+            // can cost the map the Crown.
             Color.clear
                 .allowsHitTesting(false)
                 .overlay(alignment: .top) { topChip }
@@ -134,23 +168,6 @@ struct MapPageView: View {
                 .overlay(alignment: .leading) { zoomControls }
                 .overlay(alignment: .bottomTrailing) { controls }
         }
-        .focusable(true)
-        .focused($isCrownFocused)
-        .digitalCrownRotation(
-            $zoomExponent,
-            from: Self.minimumExponent,
-            through: Self.maximumExponent,
-            by: Self.exponentStep,
-            // Sensitivity is defined per whole unit of the bound value, and a
-            // unit here is a doubling of the ground shown — the entire range
-            // from a street to a mountainside is only about 7.6 of them. At
-            // medium that is some six full turns of the Crown end to end, so a
-            // normal flick moved the scale by an amount too small to see and
-            // the map looked unresponsive even when it was listening.
-            sensitivity: .high,
-            isContinuous: false,
-            isHapticFeedbackEnabled: true
-        )
         .onChange(of: zoomExponent) { _, _ in
             zoomToken += 1
         }
