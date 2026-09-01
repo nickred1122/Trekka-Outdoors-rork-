@@ -271,6 +271,9 @@ struct WorkoutPagerView: View {
                     .background(WatchTheme.surface.opacity(0.9), in: .circle)
             }
             .buttonStyle(.plain)
+            // Out of the focus system, like the map's own controls: a Button
+            // over the map is a rival for the Crown the map needs.
+            .focusable(false)
             .padding(6)
             .accessibilityLabel("Back to metrics")
         }

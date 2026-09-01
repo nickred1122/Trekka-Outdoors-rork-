@@ -50,6 +50,10 @@ struct MapPageView: View {
     /// carousel holds it until something takes it away. Without claiming it here
     /// the map was being turned past — the Crown scrolled the pager underneath
     /// instead of zooming, which reads on the wrist as zoom being broken.
+    ///
+    /// Read as well as written: the map says out loud when it does not hold the
+    /// Crown, because there is otherwise nothing on screen to tell the athlete
+    /// that the control they are turning is wired to something else.
     @FocusState private var isCrownFocused: Bool
     /// The running claim, so a fresh one replaces it rather than racing it.
     @State private var crownClaim: Task<Void, Never>?
@@ -95,9 +99,10 @@ struct MapPageView: View {
 
     var body: some View {
         mapPage
-            // Claimed as the map appears, and re-claimed after every tap: a
-            // Button takes focus with it, and a map whose Crown works only until
-            // you touch something is worse than one that never worked.
+            // Claimed as the map appears. The controls no longer take the Crown
+            // with them when tapped, so this is the only claim that has to land
+            // — and if it is ever refused the chip at the top says so and offers
+            // it back, rather than leaving the athlete turning a dead Crown.
             .onAppear { claimCrown() }
             .onDisappear {
                 crownClaim?.cancel()
@@ -199,38 +204,32 @@ struct MapPageView: View {
 
     /// Takes the Crown for the map, and keeps asking until it sticks.
     ///
-    /// One claim on appear is not enough. The map slides in over about 0.28s,
-    /// and SwiftUI keeps the outgoing page carousel mounted for the whole of
-    /// that transition — still holding the Crown. A claim made in that window is
-    /// handed straight back, and by the time the carousel finally leaves,
-    /// nothing is asking for the Crown any more: the map ends up focusable but
-    /// unfocused, which is why panning worked and zooming did nothing.
+    /// The previous version of this did the one thing a focus claim must never
+    /// do: it wrote `false` before each retry, to force SwiftUI to re-run a
+    /// write it would otherwise treat as unchanged. But writing `false` into a
+    /// `@FocusState` is not a no-op waiting to be re-triggered — it is an
+    /// instruction to *give the Crown away*. So the retry loop spent most of
+    /// the first second of every visit to the map actively surrendering focus,
+    /// five times over, to whichever view SwiftUI picked up next. The claim was
+    /// fighting itself, and the harder it retried the worse it got.
     ///
-    /// The claim is therefore re-asserted across a window that outlasts the
-    /// transition, and each attempt drops focus before asking for it again.
-    /// That second part is the one that was missing: `@FocusState` is a value,
-    /// not a command, so writing `true` into a property that already reads
-    /// `true` changes nothing and SwiftUI never re-runs focus. Because a
-    /// refused claim leaves the property stuck at `true`, every retry after the
-    /// first was a silent no-op — the loop looked like eight attempts and was
-    /// really only ever one.
+    /// This only ever asks. Re-asserting `true` on a property that already
+    /// reads `true` costs nothing, and on one that was quietly reset is a real
+    /// retry — so the ladder covers the page transition without ever letting
+    /// go of what it has already won.
     private func claimCrown() {
         crownClaim?.cancel()
-        let tokenAtStart = zoomToken
         crownClaim = Task {
-            for attempt in 0..<6 {
+            // Spread across the map's 0.28s slide-in, so a claim refused while
+            // the outgoing page is still mounted gets asked again after it has
+            // actually left.
+            for delay in [0, 150, 450, 900] {
                 guard !Task.isCancelled else { return }
-                // The Crown has answered, so the claim landed. Stop, rather
-                // than dropping focus underneath a turn already in progress.
-                if zoomToken != tokenAtStart { return }
-
-                if attempt > 0 {
-                    isCrownFocused = false
-                    try? await Task.sleep(for: .milliseconds(20))
+                if delay > 0 {
+                    try? await Task.sleep(for: .milliseconds(delay))
                     guard !Task.isCancelled else { return }
                 }
                 isCrownFocused = true
-                try? await Task.sleep(for: .milliseconds(attempt == 0 ? 80 : 150))
             }
         }
     }
@@ -280,15 +279,52 @@ struct MapPageView: View {
         )
     }
 
-    /// One slot at the top, shared: the scale while zooming, otherwise whatever
-    /// the athlete most needs to know about the course.
+    /// One slot at the top, shared: the scale while zooming, then anything
+    /// wrong, then whatever the athlete most needs to know about the course.
     @ViewBuilder
     private var topChip: some View {
         if showsScaleChip {
             scaleChip
+        } else if metrics.offCourseMetres > 45 {
+            offCourseChip
+        } else if !isCrownFocused {
+            crownChip
         } else {
             navigationChip
         }
+    }
+
+    /// Says when the Crown is wired to something other than this map.
+    ///
+    /// Focus is invisible. When it is refused there is no cursor, no highlight
+    /// and no sound — the athlete simply turns the Crown and nothing happens,
+    /// with no way of telling a broken feature from a lost claim. So the map
+    /// admits it, and the chip is the way back.
+    private var crownChip: some View {
+        Button { claimCrown() } label: {
+            Label("Crown busy · tap", systemImage: "arrow.clockwise")
+                .font(.watch(9, weight: .bold))
+                .foregroundStyle(WatchTheme.canvas)
+                .lineLimit(1)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(WatchTheme.highlight, in: .capsule)
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        .padding(.top, topInset)
+        .accessibilityLabel("The Digital Crown is not controlling the map. Tap to take it back.")
+    }
+
+    private var offCourseChip: some View {
+        Label("Off course \(WatchFormat.integer(metrics.offCourseMetres)) m", systemImage: "exclamationmark.triangle.fill")
+            .font(.watch(10, weight: .bold))
+            .foregroundStyle(WatchTheme.canvas)
+            .lineLimit(1)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(WatchTheme.danger, in: .capsule)
+            .padding(.top, topInset)
     }
 
     /// Says what the Crown just did, in ground covered rather than a zoom number.
@@ -309,16 +345,7 @@ struct MapPageView: View {
 
     @ViewBuilder
     private var navigationChip: some View {
-        if metrics.offCourseMetres > 45 {
-            Label("Off course \(WatchFormat.integer(metrics.offCourseMetres)) m", systemImage: "exclamationmark.triangle.fill")
-                .font(.watch(10, weight: .bold))
-                .foregroundStyle(WatchTheme.canvas)
-                .lineLimit(1)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 3)
-                .background(WatchTheme.danger, in: .capsule)
-                .padding(.top, topInset)
-        } else if isExploring {
+        if isExploring {
             // Says why swiping stopped working, and how to get it back.
             Label("Panning · tap \u{2713} to page", systemImage: "hand.draw.fill")
                 .font(.watch(9, weight: .bold))
@@ -459,6 +486,14 @@ struct MapPageView: View {
                 .contentShape(.circle)
         }
         .buttonStyle(.plain)
+        // Every button sitting over the map is a rival for the Crown. A Button
+        // is focusable by default, so the map was surrounded by five views all
+        // entitled to the focus it needed, and SwiftUI had no reason to prefer
+        // the map — tapping any control handed the Crown to that control and
+        // left the map focusable but unfocused. Taking them out of the focus
+        // system entirely leaves exactly one candidate on the page. They stay
+        // fully tappable: focus governs the Crown, not the finger.
+        .focusable(false)
         .disabled(!isEnabled)
         .accessibilityLabel(label)
     }
