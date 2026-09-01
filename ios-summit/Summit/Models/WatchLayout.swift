@@ -6,7 +6,7 @@ import SwiftUI
 /// layout designed here is the same document the watch reads.
 
 nonisolated enum WatchMetricGroup: String, CaseIterable, Codable, Sendable, Identifiable {
-    case time, distance, pace, heart, elevation, effort, navigation, system
+    case time, distance, pace, heart, elevation, effort, navigation, daylight, system
 
     var id: String { rawValue }
 
@@ -19,6 +19,7 @@ nonisolated enum WatchMetricGroup: String, CaseIterable, Codable, Sendable, Iden
         case .elevation: "Elevation"
         case .effort: "Effort"
         case .navigation: "Navigation"
+        case .daylight: "Daylight"
         case .system: "System"
         }
     }
@@ -32,6 +33,7 @@ nonisolated enum WatchMetricGroup: String, CaseIterable, Codable, Sendable, Iden
         case .elevation: "mountain.2.fill"
         case .effort: "flame.fill"
         case .navigation: "location.north.line.fill"
+        case .daylight: "sun.and.horizon.fill"
         case .system: "battery.75percent"
         }
     }
@@ -50,9 +52,10 @@ nonisolated enum WatchMetric: String, CaseIterable, Codable, Identifiable, Senda
     case distance, lapDistance, remainingDistance
     case pace, averagePace, lapPace, gradeAdjustedPace, bestPace, speed, averageSpeed, maxSpeed
     case heartRate, averageHeartRate, maxHeartRate, heartRateZone, percentMaxHeartRate
-    case altitude, ascent, descent, grade, verticalSpeed
+    case altitude, ascent, descent, grade, verticalSpeed, remainingAscent
     case calories, trainingEffect, power, cadence, averageCadence, strideLength
-    case lapCount, eta, distanceToWaypoint, nextWaypoint, offCourse
+    case lapCount, eta, distanceToWaypoint, nextWaypoint, offCourse, timeToWaypoint, routeProgress, routeDistance
+    case sunrise, sunset, timeToSunrise, timeToSunset
     case battery, gpsSignal, gpsAccuracy
 
     var id: String { rawValue }
@@ -71,14 +74,14 @@ nonisolated enum WatchMetric: String, CaseIterable, Codable, Identifiable, Senda
     var unit: String {
         let units = Formatters.units
         switch self {
-        case .duration, .movingTime, .lapTime, .timeOfDay, .eta, .nextWaypoint: return ""
-        case .distance, .lapDistance, .remainingDistance: return units.distanceUnit
+        case .duration, .movingTime, .lapTime, .timeOfDay, .eta, .nextWaypoint, .timeToWaypoint, .timeToSunrise, .timeToSunset, .sunrise, .sunset: return ""
+        case .distance, .lapDistance, .remainingDistance, .routeDistance: return units.distanceUnit
         case .pace, .averagePace, .lapPace, .gradeAdjustedPace, .bestPace: return units.paceUnit
         case .speed, .averageSpeed, .maxSpeed: return units.speedUnit
         case .heartRate, .averageHeartRate, .maxHeartRate: return "bpm"
         case .heartRateZone, .trainingEffect, .lapCount, .gpsSignal: return ""
-        case .percentMaxHeartRate, .grade, .battery: return "%"
-        case .altitude, .ascent, .descent: return units.elevationUnit
+        case .percentMaxHeartRate, .grade, .battery, .routeProgress: return "%"
+        case .altitude, .ascent, .descent, .remainingAscent: return units.elevationUnit
         case .verticalSpeed: return units.verticalSpeedUnit
         case .calories: return "kcal"
         case .power: return "W"
@@ -90,7 +93,7 @@ nonisolated enum WatchMetric: String, CaseIterable, Codable, Identifiable, Senda
 
     var requiresRoute: Bool {
         switch self {
-        case .remainingDistance, .eta, .distanceToWaypoint, .nextWaypoint, .offCourse: true
+        case .remainingDistance, .eta, .distanceToWaypoint, .nextWaypoint, .offCourse, .timeToWaypoint, .routeProgress, .routeDistance, .remainingAscent: true
         default: false
         }
     }
@@ -158,6 +161,14 @@ nonisolated enum WatchMetric: String, CaseIterable, Codable, Identifiable, Senda
         .distanceToWaypoint: .init(title: "To Next", label: "TO NEXT", preview: "480", group: .navigation),
         .nextWaypoint: .init(title: "Next Point", label: "NEXT", preview: "Saddle", group: .navigation),
         .offCourse: .init(title: "Off Course", label: "OFF COURSE", preview: "12", group: .navigation),
+        .timeToWaypoint: .init(title: "Time to Next", label: "NEXT ETA", preview: "8:32", group: .navigation),
+        .routeProgress: .init(title: "Route Complete", label: "ROUTE %", preview: "62", group: .navigation),
+        .routeDistance: .init(title: "Route Length", label: "ROUTE", preview: "12.5", group: .navigation),
+        .sunrise: .init(title: "Sunrise", label: "SUNRISE", preview: "06:12", group: .daylight),
+        .sunset: .init(title: "Sunset", label: "SUNSET", preview: "20:47", group: .daylight),
+        .timeToSunrise: .init(title: "Time to Sunrise", label: "TO SUNRISE", preview: "9:24", group: .daylight),
+        .timeToSunset: .init(title: "Daylight Left", label: "DAYLIGHT", preview: "3:26", group: .daylight),
+        .remainingAscent: .init(title: "Ascent Left", label: "ASC LEFT", preview: "438", group: .elevation),
         .battery: .init(title: "Battery", label: "BATTERY", preview: "78", group: .system),
         .gpsSignal: .init(title: "GPS Signal", label: "GPS", preview: "Good", group: .system),
         .gpsAccuracy: .init(title: "GPS Accuracy", label: "GPS ±", preview: "4", group: .system),

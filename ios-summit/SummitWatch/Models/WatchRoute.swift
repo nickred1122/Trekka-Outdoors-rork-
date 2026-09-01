@@ -63,6 +63,18 @@ nonisolated enum WatchRouteMath {
         return gain
     }
 
+    /// Positive climb still between the given point on the route and its end —
+    /// the elevation the athlete has yet to earn.
+    static func ascentRemaining(from index: Int, in points: [WatchRoutePoint]) -> Double {
+        guard points.indices.contains(index) else { return 0 }
+        var gain = 0.0
+        for position in (index + 1)..<points.count {
+            let delta = points[position].elevation - points[position - 1].elevation
+            if delta > 0 { gain += delta }
+        }
+        return gain
+    }
+
     static func cumulativeDistances(of points: [WatchRoutePoint]) -> [Double] {
         guard !points.isEmpty else { return [] }
         var result: [Double] = [0]

@@ -112,6 +112,9 @@ final class WorkoutEngine {
     private var offCourseSince: Date?
     private var lastOffCourseAlertAt: Date?
     private var lastRerouteAt: Date?
+    /// Where sun times were last computed, so they refresh on travel rather
+    /// than on every fix — the answer moves a second of arc per kilometre.
+    private var solarAnchor: CLLocationCoordinate2D?
     private var announcedApproachIDs: Set<UUID> = []
     private var announcedArrivalIDs: Set<UUID> = []
 
@@ -826,6 +829,7 @@ final class WorkoutEngine {
         metrics.horizontalAccuracy = fix.horizontalAccuracy
         if fix.horizontalAccuracy <= Fix.trustedAccuracy { hasTrustedFix = true }
         currentCoordinate = fix.coordinate
+        updateSolarTimes(coordinate: fix.coordinate)
 
         // Precise start: this is the fix the workout was waiting for.
         if phase == .acquiring, hasTrustedFix {
@@ -1057,6 +1061,24 @@ final class WorkoutEngine {
         metrics.trainingEffect = min(5, weighted / 2600)
     }
 
+    /// Sun events ride on the metrics so they can sit on a data screen like
+    /// any other reading. Recomputed only when the athlete has travelled far
+    /// enough for position to change the answer.
+    private func updateSolarTimes(coordinate: CLLocationCoordinate2D) {
+        if let anchor = solarAnchor,
+           abs(anchor.latitude - coordinate.latitude) < 0.005,
+           abs(anchor.longitude - coordinate.longitude) < 0.005 {
+            return
+        }
+        solarAnchor = coordinate
+        metrics.sunrise = SolarTimes.nextSunrise(
+            after: .now, latitude: coordinate.latitude, longitude: coordinate.longitude
+        )
+        metrics.sunset = SolarTimes.nextSunset(
+            after: .now, latitude: coordinate.latitude, longitude: coordinate.longitude
+        )
+    }
+
     private func updateNavigation() {
         guard let route, let coordinate = currentCoordinate, !route.points.isEmpty else { return }
 
@@ -1066,6 +1088,7 @@ final class WorkoutEngine {
         let covered = distances.indices.contains(nearest.index) ? distances[nearest.index] : 0
         metrics.courseDistance = covered
         metrics.remainingDistance = max(0, route.distance - covered)
+        metrics.remainingAscent = WatchRouteMath.ascentRemaining(from: nearest.index, in: route.points)
 
         if metrics.currentSpeed > 0.4 {
             metrics.etaSeconds = metrics.remainingDistance / metrics.currentSpeed

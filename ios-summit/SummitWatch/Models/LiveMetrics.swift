@@ -38,6 +38,8 @@ nonisolated struct LiveMetrics: Sendable, Equatable {
     var zoneSeconds: [TimeInterval] = [0, 0, 0, 0, 0]
 
     var remainingDistance: Double = 0
+    /// Positive climb still between the athlete and the end of the course.
+    var remainingAscent: Double = 0
     /// How far along the loaded course the athlete has reached, in metres.
     /// Measured by projecting the current fix onto the course, so it stays
     /// honest even after a detour.
@@ -51,6 +53,11 @@ nonisolated struct LiveMetrics: Sendable, Equatable {
     var isOffCourse: Bool = false
 
     var batteryFraction: Double = 1
+
+    /// Next sunrise and sunset, computed from the GPS fix. nil with no fix, or
+    /// inside the polar day and night where the event does not happen.
+    var sunrise: Date?
+    var sunset: Date?
 
     /// Signal strength 0-3 and whether the receiver is still reporting, mirrored
     /// here so both can be placed on a data screen like any other metric.
@@ -88,6 +95,18 @@ nonisolated struct LiveMetrics: Sendable, Equatable {
 
     var strideLength: Double {
         cadence > 20 ? currentSpeed * 60 / cadence : 0
+    }
+
+    /// Time to the next waypoint at the current speed; 0 when still or none.
+    var timeToWaypointSeconds: TimeInterval {
+        currentSpeed > 0.4 && distanceToWaypoint > 0 ? distanceToWaypoint / currentSpeed : 0
+    }
+
+    /// How much of the loaded course has been covered.
+    var routeProgressFraction: Double {
+        let total = courseDistance + remainingDistance
+        guard total > 0 else { return 0 }
+        return min(1, courseDistance / total)
     }
 
     var percentMaxHeartRate: Double {

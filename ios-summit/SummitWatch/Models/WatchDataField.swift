@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Groups used to organise the field picker into browsable sections.
 nonisolated enum WatchFieldGroup: String, CaseIterable, Codable, Sendable, Identifiable {
-    case time, distance, pace, heart, elevation, effort, navigation, system
+    case time, distance, pace, heart, elevation, effort, navigation, daylight, system
 
     var id: String { rawValue }
 
@@ -15,6 +15,7 @@ nonisolated enum WatchFieldGroup: String, CaseIterable, Codable, Sendable, Ident
         case .elevation: "Elevation"
         case .effort: "Effort"
         case .navigation: "Navigation"
+        case .daylight: "Daylight"
         case .system: "System"
         }
     }
@@ -28,6 +29,7 @@ nonisolated enum WatchFieldGroup: String, CaseIterable, Codable, Sendable, Ident
         case .elevation: "mountain.2.fill"
         case .effort: "flame.fill"
         case .navigation: "location.north.line.fill"
+        case .daylight: "sun.and.horizon.fill"
         case .system: "gauge.with.dots.needle.bottom.50percent"
         }
     }
@@ -44,11 +46,13 @@ nonisolated enum WatchDataField: String, CaseIterable, Codable, Identifiable, Se
     // Heart
     case heartRate, averageHeartRate, maxHeartRate, heartRateZone, percentMaxHeartRate
     // Elevation
-    case altitude, ascent, descent, grade, verticalSpeed
+    case altitude, ascent, descent, grade, verticalSpeed, remainingAscent
     // Effort
     case calories, trainingEffect, power, cadence, averageCadence, strideLength
     // Navigation
-    case lapCount, eta, distanceToWaypoint, nextWaypoint, offCourse
+    case lapCount, eta, distanceToWaypoint, nextWaypoint, offCourse, timeToWaypoint, routeProgress, routeDistance
+    // Daylight
+    case sunrise, sunset, timeToSunrise, timeToSunset
     // System
     case battery, gpsSignal, gpsAccuracy
 
@@ -79,6 +83,7 @@ nonisolated enum WatchDataField: String, CaseIterable, Codable, Identifiable, Se
         case .altitude: "Elevation"
         case .ascent: "Total Ascent"
         case .descent: "Total Descent"
+        case .remainingAscent: "Ascent Left"
         case .grade: "Grade"
         case .verticalSpeed: "Vertical Speed"
         case .calories: "Calories"
@@ -92,6 +97,13 @@ nonisolated enum WatchDataField: String, CaseIterable, Codable, Identifiable, Se
         case .distanceToWaypoint: "To Next"
         case .nextWaypoint: "Next Point"
         case .offCourse: "Off Course"
+        case .timeToWaypoint: "Time to Next"
+        case .routeProgress: "Route Complete"
+        case .routeDistance: "Route Length"
+        case .sunrise: "Sunrise"
+        case .sunset: "Sunset"
+        case .timeToSunrise: "Time to Sunrise"
+        case .timeToSunset: "Daylight Left"
         case .battery: "Battery"
         case .gpsSignal: "GPS Signal"
         case .gpsAccuracy: "GPS Accuracy"
@@ -137,6 +149,14 @@ nonisolated enum WatchDataField: String, CaseIterable, Codable, Identifiable, Se
         case .distanceToWaypoint: "TO NEXT"
         case .nextWaypoint: "NEXT"
         case .offCourse: "OFF COURSE"
+        case .timeToWaypoint: "NEXT ETA"
+        case .routeProgress: "ROUTE %"
+        case .routeDistance: "ROUTE"
+        case .sunrise: "SUNRISE"
+        case .sunset: "SUNSET"
+        case .timeToSunrise: "TO SUNRISE"
+        case .timeToSunset: "DAYLIGHT"
+        case .remainingAscent: "ASC LEFT"
         case .battery: "BATTERY"
         case .gpsSignal: "GPS"
         case .gpsAccuracy: "GPS ±"
@@ -148,14 +168,14 @@ nonisolated enum WatchDataField: String, CaseIterable, Codable, Identifiable, Se
     var unit: String {
         let units = WatchFormat.units
         switch self {
-        case .duration, .movingTime, .lapTime, .timeOfDay, .eta, .nextWaypoint: return ""
-        case .distance, .lapDistance, .remainingDistance: return units.distanceUnit
+        case .duration, .movingTime, .lapTime, .timeOfDay, .eta, .nextWaypoint, .timeToWaypoint, .timeToSunrise, .timeToSunset, .sunrise, .sunset: return ""
+        case .distance, .lapDistance, .remainingDistance, .routeDistance: return units.distanceUnit
         case .pace, .averagePace, .lapPace, .gradeAdjustedPace, .bestPace: return units.paceUnit
         case .speed, .averageSpeed, .maxSpeed: return units.speedUnit
         case .heartRate, .averageHeartRate, .maxHeartRate: return "bpm"
         case .heartRateZone: return ""
-        case .percentMaxHeartRate, .grade: return "%"
-        case .altitude, .ascent, .descent: return units.elevationUnit
+        case .percentMaxHeartRate, .grade, .routeProgress: return "%"
+        case .altitude, .ascent, .descent, .remainingAscent: return units.elevationUnit
         case .distanceToWaypoint, .offCourse: return units.shortDistanceUnit
         case .verticalSpeed: return units.verticalSpeedUnit
         case .calories: return "kcal"
@@ -176,9 +196,10 @@ nonisolated enum WatchDataField: String, CaseIterable, Codable, Identifiable, Se
         case .distance, .lapDistance, .remainingDistance: .distance
         case .pace, .averagePace, .lapPace, .gradeAdjustedPace, .bestPace, .speed, .averageSpeed, .maxSpeed: .pace
         case .heartRate, .averageHeartRate, .maxHeartRate, .heartRateZone, .percentMaxHeartRate: .heart
-        case .altitude, .ascent, .descent, .grade, .verticalSpeed: .elevation
+        case .altitude, .ascent, .descent, .grade, .verticalSpeed, .remainingAscent: .elevation
         case .calories, .trainingEffect, .power, .cadence, .averageCadence, .strideLength: .effort
-        case .lapCount, .eta, .distanceToWaypoint, .nextWaypoint, .offCourse: .navigation
+        case .lapCount, .eta, .distanceToWaypoint, .nextWaypoint, .offCourse, .timeToWaypoint, .routeProgress, .routeDistance: .navigation
+        case .sunrise, .sunset, .timeToSunrise, .timeToSunset: .daylight
         case .battery, .gpsSignal, .gpsAccuracy: .system
         }
     }
@@ -186,7 +207,7 @@ nonisolated enum WatchDataField: String, CaseIterable, Codable, Identifiable, Se
     /// Fields that only make sense when a route is loaded.
     var requiresRoute: Bool {
         switch self {
-        case .remainingDistance, .eta, .distanceToWaypoint, .nextWaypoint, .offCourse: true
+        case .remainingDistance, .eta, .distanceToWaypoint, .nextWaypoint, .offCourse, .timeToWaypoint, .routeProgress, .routeDistance, .remainingAscent: true
         default: false
         }
     }
@@ -241,6 +262,20 @@ nonisolated enum WatchDataField: String, CaseIterable, Codable, Identifiable, Se
         case .distanceToWaypoint: metrics.distanceToWaypoint > 0 ? WatchFormat.shortDistance(metrics.distanceToWaypoint) : "--"
         case .nextWaypoint: metrics.nextWaypointName
         case .offCourse: WatchFormat.shortDistance(metrics.offCourseMetres)
+        case .timeToWaypoint: metrics.timeToWaypointSeconds > 0
+            ? WatchFormat.duration(metrics.timeToWaypointSeconds)
+            : "--:--"
+        case .routeProgress: metrics.routeProgressFraction > 0
+            ? WatchFormat.percent(metrics.routeProgressFraction)
+            : "--"
+        case .routeDistance: metrics.courseDistance + metrics.remainingDistance > 0
+            ? WatchFormat.distance(metrics.courseDistance + metrics.remainingDistance)
+            : "--"
+        case .sunrise: metrics.sunrise.map { WatchFormat.clock($0) } ?? "--:--"
+        case .sunset: metrics.sunset.map { WatchFormat.clock($0) } ?? "--:--"
+        case .timeToSunrise: metrics.sunrise.map { WatchFormat.duration(max(0, $0.timeIntervalSinceNow)) } ?? "--:--"
+        case .timeToSunset: metrics.sunset.map { WatchFormat.duration(max(0, $0.timeIntervalSinceNow)) } ?? "--:--"
+        case .remainingAscent: metrics.remainingAscent > 0 ? WatchFormat.elevation(metrics.remainingAscent) : "--"
         case .battery: WatchFormat.percent(metrics.batteryFraction)
         // Three bars of signal, or plain words when there is none to report.
         case .gpsSignal: metrics.isGPSLive ? "\(max(0, min(3, metrics.gpsBars)))/3" : "--"
@@ -285,6 +320,14 @@ nonisolated enum WatchDataField: String, CaseIterable, Codable, Identifiable, Se
         case .distanceToWaypoint: "480"
         case .nextWaypoint: "Saddle"
         case .offCourse: "12"
+        case .timeToWaypoint: "8:32"
+        case .routeProgress: "62"
+        case .routeDistance: "12.5"
+        case .sunrise: "06:12"
+        case .sunset: "20:47"
+        case .timeToSunrise: "9:24"
+        case .timeToSunset: "3:26"
+        case .remainingAscent: "438"
         case .battery: "78"
         case .gpsSignal: "3/3"
         case .gpsAccuracy: "6"
