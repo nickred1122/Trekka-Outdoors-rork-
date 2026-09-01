@@ -80,6 +80,19 @@ nonisolated struct LiveMetrics: Sendable, Equatable {
 
     var batteryFraction: Double = 1
 
+    /// Air pressure in hectopascals, from the watch's own barometer. Zero until
+    /// the first reading, and on any watch without one.
+    var pressure: Double = 0
+
+    /// Swimming. Strokes are cumulative for the session; lengths only count on
+    /// pool swims, where HealthKit knows how long a length is.
+    var strokes: Double = 0
+    var strokeRate: Double = 0
+    var poolLengths: Int = 0
+    var lastLengthSeconds: TimeInterval = 0
+    /// Seconds plus strokes for the last completed length. Lower is better.
+    var swolf: Double = 0
+
     /// Next sunrise and sunset, computed from the GPS fix. nil with no fix, or
     /// inside the polar day and night where the event does not happen.
     var sunrise: Date?
@@ -102,6 +115,10 @@ nonisolated struct LiveMetrics: Sendable, Equatable {
 
     /// Athlete maximum heart rate used for zone maths.
     static var maxHeartRateCeiling: Double = 188
+    /// Measured resting heart rate, read from Health. Zero until Health has one
+    /// to give, which is what keeps heart rate reserve honest rather than
+    /// resting on an assumed floor.
+    static var restingHeartRateFloor: Double = 0
 
     var pace: TimeInterval {
         currentSpeed > 0.35 ? 1000 / currentSpeed : 0
@@ -165,6 +182,20 @@ nonisolated struct LiveMetrics: Sendable, Equatable {
     var percentMaxHeartRate: Double {
         guard LiveMetrics.maxHeartRateCeiling > 0 else { return 0 }
         return heartRate / LiveMetrics.maxHeartRateCeiling
+    }
+
+    /// Effort as a share of the range between resting and maximum heart rate.
+    ///
+    /// A truer measure of effort than percentage of maximum, because it starts
+    /// from the heart's actual floor rather than from zero — an athlete resting
+    /// at 45 and one resting at 70 are not working equally hard at 140. Returns
+    /// nil until Health has supplied a real resting rate, so the field shows
+    /// "--" rather than a figure computed from a guess.
+    var percentHeartRateReserve: Double? {
+        let resting = LiveMetrics.restingHeartRateFloor
+        let ceiling = LiveMetrics.maxHeartRateCeiling
+        guard resting > 0, ceiling > resting, heartRate > 0 else { return nil }
+        return min(1.2, max(0, (heartRate - resting) / (ceiling - resting)))
     }
 
     var heartRateZone: Int {

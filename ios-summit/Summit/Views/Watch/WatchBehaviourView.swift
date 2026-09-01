@@ -82,7 +82,21 @@ struct WatchBehaviourView: View {
             } header: {
                 Text("Heart rate")
             } footer: {
-                Text("Your zones are worked out from this, on both devices.")
+                Text("Your zones are worked out from this, on both devices. Heart rate reserve also uses your resting rate, which Trekka reads from Health.")
+            }
+
+            Section {
+                Picker("Pool length", selection: $layout.poolLengthMetres) {
+                    Text("25 m").tag(25.0)
+                    Text("33⅓ m").tag(33.33)
+                    Text("50 m").tag(50.0)
+                    Text("25 yd").tag(22.86)
+                    Text("33⅓ yd").tag(30.48)
+                }
+            } header: {
+                Text("Pool swimming")
+            } footer: {
+                Text("The watch counts lengths by knowing how long one is — there is no way to measure it from your wrist. Lengths and SWOLF depend on getting this right.")
             }
         }
         .listStyle(.insetGrouped)

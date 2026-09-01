@@ -717,6 +717,7 @@
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Trekka Outdoors reads your heart rate and recovery data to track workouts and score your readiness.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Trekka Outdoors saves your recorded workouts to the Health app.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Trekka Outdoors uses GPS to record your route, distance and elevation while you train.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Trekka Outdoors reads the barometer to show air pressure and to track elevation changes while you train.";
 				PRODUCT_BUNDLE_IDENTIFIER = app.rork.eeq1re3rqvs8qh5xs7zq8.summitwatch;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -750,6 +751,7 @@
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Trekka Outdoors reads your heart rate and recovery data to track workouts and score your readiness.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Trekka Outdoors saves your recorded workouts to the Health app.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Trekka Outdoors uses GPS to record your route, distance and elevation while you train.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Trekka Outdoors reads the barometer to show air pressure and to track elevation changes while you train.";
 				PRODUCT_BUNDLE_IDENTIFIER = app.rork.eeq1re3rqvs8qh5xs7zq8.summitwatch;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;

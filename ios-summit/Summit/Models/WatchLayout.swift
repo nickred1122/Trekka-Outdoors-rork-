@@ -6,7 +6,7 @@ import SwiftUI
 /// layout designed here is the same document the watch reads.
 
 nonisolated enum WatchMetricGroup: String, CaseIterable, Codable, Sendable, Identifiable {
-    case time, distance, pace, heart, elevation, effort, navigation, daylight, system
+    case time, distance, pace, heart, elevation, effort, navigation, daylight, swim, system
 
     var id: String { rawValue }
 
@@ -20,6 +20,7 @@ nonisolated enum WatchMetricGroup: String, CaseIterable, Codable, Sendable, Iden
         case .effort: "Effort"
         case .navigation: "Navigation"
         case .daylight: "Daylight"
+        case .swim: "Swim"
         case .system: "System"
         }
     }
@@ -34,6 +35,7 @@ nonisolated enum WatchMetricGroup: String, CaseIterable, Codable, Sendable, Iden
         case .effort: "flame.fill"
         case .navigation: "location.north.line.fill"
         case .daylight: "sun.and.horizon.fill"
+        case .swim: "figure.pool.swim"
         case .system: "battery.75percent"
         }
     }
@@ -52,13 +54,14 @@ nonisolated enum WatchMetric: String, CaseIterable, Codable, Identifiable, Senda
     case distance, lapDistance, remainingDistance, lastLapDistance
     case pace, averagePace, lapPace, gradeAdjustedPace, bestPace, speed, averageSpeed, maxSpeed, lastLapPace
     case heartRate, averageHeartRate, maxHeartRate, heartRateZone, percentMaxHeartRate
-    case lapHeartRate, lastLapHeartRate, timeInZone
+    case lapHeartRate, lastLapHeartRate, timeInZone, percentHeartRateReserve
     case altitude, ascent, descent, grade, verticalSpeed, remainingAscent
-    case lapAscent, lastLapAscent, maxAltitude, minAltitude, remainingDescent, routeAscent
+    case lapAscent, lastLapAscent, maxAltitude, minAltitude, remainingDescent, routeAscent, pressure
     case calories, trainingEffect, power, cadence, averageCadence, strideLength, steps
     case lapCount, eta, distanceToWaypoint, nextWaypoint, offCourse, timeToWaypoint, routeProgress, routeDistance
     case bearing, latitude, longitude, distanceToStart
     case sunrise, sunset, timeToSunrise, timeToSunset
+    case strokes, strokeRate, poolLengths, swolf, lastLengthTime
     case battery, gpsSignal, gpsAccuracy
 
     var id: String { rawValue }
@@ -79,13 +82,16 @@ nonisolated enum WatchMetric: String, CaseIterable, Codable, Identifiable, Senda
         switch self {
         case .duration, .movingTime, .lapTime, .timeOfDay, .eta, .nextWaypoint, .timeToWaypoint, .timeToSunrise, .timeToSunset, .sunrise, .sunset: return ""
         case .pausedTime, .averageLapTime, .lastLapTime, .timeInZone, .steps, .latitude, .longitude: return ""
+        case .strokes, .poolLengths, .swolf, .lastLengthTime: return ""
+        case .strokeRate: return "spm"
+        case .pressure: return "hPa"
         case .bearing: return "°"
         case .distance, .lapDistance, .remainingDistance, .routeDistance, .lastLapDistance, .distanceToStart: return units.distanceUnit
         case .pace, .averagePace, .lapPace, .gradeAdjustedPace, .bestPace, .lastLapPace: return units.paceUnit
         case .speed, .averageSpeed, .maxSpeed: return units.speedUnit
         case .heartRate, .averageHeartRate, .maxHeartRate, .lapHeartRate, .lastLapHeartRate: return "bpm"
         case .heartRateZone, .trainingEffect, .lapCount, .gpsSignal: return ""
-        case .percentMaxHeartRate, .grade, .battery, .routeProgress: return "%"
+        case .percentMaxHeartRate, .grade, .battery, .routeProgress, .percentHeartRateReserve: return "%"
         case .altitude, .ascent, .descent, .remainingAscent, .lapAscent, .lastLapAscent,
              .maxAltitude, .minAltitude, .remainingDescent, .routeAscent: return units.elevationUnit
         case .verticalSpeed: return units.verticalSpeedUnit
@@ -177,6 +183,13 @@ nonisolated enum WatchMetric: String, CaseIterable, Codable, Identifiable, Senda
         .timeToSunset: .init(title: "Daylight Left", label: "DAYLIGHT", preview: "3:26", group: .daylight),
         .remainingAscent: .init(title: "Ascent Left", label: "ASC LEFT", preview: "438", group: .elevation),
         .remainingDescent: .init(title: "Descent Left", label: "DESC LEFT", preview: "512", group: .elevation),
+        .pressure: .init(title: "Air Pressure", label: "PRESSURE", preview: "1013", group: .elevation),
+        .percentHeartRateReserve: .init(title: "% HR Reserve", label: "% HRR", preview: "74", group: .heart),
+        .strokes: .init(title: "Strokes", label: "STROKES", preview: "412", group: .swim),
+        .strokeRate: .init(title: "Stroke Rate", label: "STROKE RATE", preview: "32", group: .swim),
+        .poolLengths: .init(title: "Lengths", label: "LENGTHS", preview: "24", group: .swim),
+        .swolf: .init(title: "SWOLF", label: "SWOLF", preview: "38", group: .swim),
+        .lastLengthTime: .init(title: "Last Length", label: "LAST LENGTH", preview: "0:22", group: .swim),
         .routeAscent: .init(title: "Route Ascent", label: "ROUTE ASC", preview: "1080", group: .elevation),
         .lapAscent: .init(title: "Lap Ascent", label: "LAP ASC", preview: "64", group: .elevation),
         .lastLapAscent: .init(title: "Last Lap Ascent", label: "LAST ASC", preview: "58", group: .elevation),

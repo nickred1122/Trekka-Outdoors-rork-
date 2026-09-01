@@ -96,6 +96,12 @@ final class WorkoutEngine {
     /// Previous cumulative step reading, for deriving running cadence.
     private var lastStepTotal: Double?
     private var lastStepTotalAt: Date?
+    /// Previous cumulative stroke reading, for deriving swim stroke rate.
+    private var lastStrokeTotal: Double?
+    private var lastStrokeTotalAt: Date?
+    /// When the length in progress began, and the stroke count it started from.
+    private var lastLengthAt: Date?
+    private var strokesAtLastLength: Double = 0
     /// Battery readings taken in each mode, kept apart so the benefit of power
     /// saver can be measured rather than assumed.
     private var normalSamples: [PowerBudget.Sample] = []
@@ -440,6 +446,10 @@ final class WorkoutEngine {
         track = []
         startCoordinate = nil
         solarAnchor = nil
+        lastStrokeTotal = nil
+        lastStrokeTotalAt = nil
+        lastLengthAt = nil
+        strokesAtLastLength = 0
         heartRateSum = 0
         heartRateSamples = 0
         cadenceSum = 0
@@ -489,7 +499,11 @@ final class WorkoutEngine {
                     guard case .countdown = phase else { return }
                 }
             }
-            await sensors.start(sport: sport, isPowerSaving: isPowerSaving)
+            await sensors.start(
+                sport: sport,
+                isPowerSaving: isPowerSaving,
+                poolLengthMetres: settings?.poolLengthMetres ?? 25
+            )
 
             // Precise start holds the clock until the receiver can actually
             // place you. Without it the first fix lands wherever the last
@@ -792,6 +806,63 @@ final class WorkoutEngine {
         sensors.onStepTotal = { [weak self] steps in
             self?.ingest(stepTotal: steps)
         }
+        sensors.onStrokeTotal = { [weak self] strokes in
+            self?.ingest(strokeTotal: strokes)
+        }
+        sensors.onLengthCompleted = { [weak self] in
+            self?.completeLength()
+        }
+        sensors.onPressure = { [weak self] kilopascals in
+            guard let self, kilopascals > 0 else { return }
+            // Hectopascals is what every forecast and storm warning is quoted
+            // in, so the conversion happens once, here.
+            metrics.pressure = kilopascals * 10
+        }
+    }
+
+    /// Turns the running stroke total into a rate, and remembers the count so a
+    /// completed length knows how many strokes it took.
+    private func ingest(strokeTotal strokes: Double) {
+        guard strokes.isFinite, strokes >= 0 else { return }
+        defer {
+            lastStrokeTotal = strokes
+            lastStrokeTotalAt = .now
+        }
+        metrics.strokes = strokes
+        guard phase == .active,
+              let previousTotal = lastStrokeTotal,
+              let previousAt = lastStrokeTotalAt else { return }
+
+        let seconds = Date().timeIntervalSince(previousAt)
+        let newStrokes = strokes - previousTotal
+        guard seconds >= 5, seconds <= 120, newStrokes >= 0 else { return }
+
+        let perMinute = newStrokes / seconds * 60
+        guard perMinute > 0, perMinute < 200 else { return }
+        metrics.strokeRate = metrics.strokeRate == 0
+            ? perMinute
+            : metrics.strokeRate * 0.6 + perMinute * 0.4
+    }
+
+    /// Banks one pool length and scores it.
+    ///
+    /// SWOLF is the sum of the seconds a length took and the strokes it cost —
+    /// the standard measure of swimming efficiency, where lower is better
+    /// because it rewards going faster without thrashing.
+    private func completeLength() {
+        guard phase == .active else { return }
+        let now = Date()
+        let startedAt = lastLengthAt ?? metrics.startDate
+        let seconds = now.timeIntervalSince(startedAt)
+        lastLengthAt = now
+
+        metrics.poolLengths += 1
+        let strokesThisLength = max(0, metrics.strokes - strokesAtLastLength)
+        strokesAtLastLength = metrics.strokes
+
+        guard seconds > 0, seconds < 600 else { return }
+        metrics.lastLengthSeconds = seconds
+        metrics.swolf = seconds + strokesThisLength
     }
 
     /// Turns the running step total into steps per minute.

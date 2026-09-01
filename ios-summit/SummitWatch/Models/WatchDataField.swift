@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Groups used to organise the field picker into browsable sections.
 nonisolated enum WatchFieldGroup: String, CaseIterable, Codable, Sendable, Identifiable {
-    case time, distance, pace, heart, elevation, effort, navigation, daylight, system
+    case time, distance, pace, heart, elevation, effort, navigation, daylight, swim, system
 
     var id: String { rawValue }
 
@@ -16,6 +16,7 @@ nonisolated enum WatchFieldGroup: String, CaseIterable, Codable, Sendable, Ident
         case .effort: "Effort"
         case .navigation: "Navigation"
         case .daylight: "Daylight"
+        case .swim: "Swim"
         case .system: "System"
         }
     }
@@ -30,6 +31,7 @@ nonisolated enum WatchFieldGroup: String, CaseIterable, Codable, Sendable, Ident
         case .effort: "flame.fill"
         case .navigation: "location.north.line.fill"
         case .daylight: "sun.and.horizon.fill"
+        case .swim: "figure.pool.swim"
         case .system: "gauge.with.dots.needle.bottom.50percent"
         }
     }
@@ -38,21 +40,26 @@ nonisolated enum WatchFieldGroup: String, CaseIterable, Codable, Sendable, Ident
 /// Every metric that can be placed on a customizable data screen.
 nonisolated enum WatchDataField: String, CaseIterable, Codable, Identifiable, Sendable {
     // Time
-    case duration, movingTime, lapTime, timeOfDay
+    case duration, movingTime, lapTime, timeOfDay, pausedTime, averageLapTime, lastLapTime
     // Distance
-    case distance, lapDistance, remainingDistance
+    case distance, lapDistance, remainingDistance, lastLapDistance
     // Pace & speed
-    case pace, averagePace, lapPace, gradeAdjustedPace, bestPace, speed, averageSpeed, maxSpeed
+    case pace, averagePace, lapPace, gradeAdjustedPace, bestPace, speed, averageSpeed, maxSpeed, lastLapPace
     // Heart
     case heartRate, averageHeartRate, maxHeartRate, heartRateZone, percentMaxHeartRate
+    case lapHeartRate, lastLapHeartRate, timeInZone, percentHeartRateReserve
     // Elevation
     case altitude, ascent, descent, grade, verticalSpeed, remainingAscent
+    case lapAscent, lastLapAscent, maxAltitude, minAltitude, remainingDescent, routeAscent, pressure
     // Effort
-    case calories, trainingEffect, power, cadence, averageCadence, strideLength
+    case calories, trainingEffect, power, cadence, averageCadence, strideLength, steps
     // Navigation
     case lapCount, eta, distanceToWaypoint, nextWaypoint, offCourse, timeToWaypoint, routeProgress, routeDistance
+    case bearing, latitude, longitude, distanceToStart
     // Daylight
     case sunrise, sunset, timeToSunrise, timeToSunset
+    // Swim
+    case strokes, strokeRate, poolLengths, swolf, lastLengthTime
     // System
     case battery, gpsSignal, gpsAccuracy
 
@@ -104,6 +111,32 @@ nonisolated enum WatchDataField: String, CaseIterable, Codable, Identifiable, Se
         case .sunset: "Sunset"
         case .timeToSunrise: "Time to Sunrise"
         case .timeToSunset: "Daylight Left"
+        case .pausedTime: "Paused Time"
+        case .averageLapTime: "Avg Lap Time"
+        case .lastLapTime: "Last Lap Time"
+        case .lastLapDistance: "Last Lap Distance"
+        case .lastLapPace: "Last Lap Pace"
+        case .lapHeartRate: "Lap Heart Rate"
+        case .lastLapHeartRate: "Last Lap HR"
+        case .timeInZone: "Time in Zone"
+        case .percentHeartRateReserve: "% HR Reserve"
+        case .lapAscent: "Lap Ascent"
+        case .lastLapAscent: "Last Lap Ascent"
+        case .maxAltitude: "Max Elevation"
+        case .minAltitude: "Min Elevation"
+        case .remainingDescent: "Descent Left"
+        case .routeAscent: "Route Ascent"
+        case .pressure: "Air Pressure"
+        case .steps: "Steps"
+        case .bearing: "Bearing"
+        case .latitude: "Latitude"
+        case .longitude: "Longitude"
+        case .distanceToStart: "Distance to Start"
+        case .strokes: "Strokes"
+        case .strokeRate: "Stroke Rate"
+        case .poolLengths: "Lengths"
+        case .swolf: "SWOLF"
+        case .lastLengthTime: "Last Length"
         case .battery: "Battery"
         case .gpsSignal: "GPS Signal"
         case .gpsAccuracy: "GPS Accuracy"
@@ -157,6 +190,32 @@ nonisolated enum WatchDataField: String, CaseIterable, Codable, Identifiable, Se
         case .timeToSunrise: "TO SUNRISE"
         case .timeToSunset: "DAYLIGHT"
         case .remainingAscent: "ASC LEFT"
+        case .pausedTime: "PAUSED"
+        case .averageLapTime: "AVG LAP"
+        case .lastLapTime: "LAST LAP"
+        case .lastLapDistance: "LAST DIST"
+        case .lastLapPace: "LAST PACE"
+        case .lapHeartRate: "LAP HR"
+        case .lastLapHeartRate: "LAST HR"
+        case .timeInZone: "IN ZONE"
+        case .percentHeartRateReserve: "% HRR"
+        case .lapAscent: "LAP ASC"
+        case .lastLapAscent: "LAST ASC"
+        case .maxAltitude: "MAX ELEV"
+        case .minAltitude: "MIN ELEV"
+        case .remainingDescent: "DESC LEFT"
+        case .routeAscent: "ROUTE ASC"
+        case .pressure: "PRESSURE"
+        case .steps: "STEPS"
+        case .bearing: "BEARING"
+        case .latitude: "LAT"
+        case .longitude: "LON"
+        case .distanceToStart: "TO START"
+        case .strokes: "STROKES"
+        case .strokeRate: "STROKE RATE"
+        case .poolLengths: "LENGTHS"
+        case .swolf: "SWOLF"
+        case .lastLengthTime: "LAST LENGTH"
         case .battery: "BATTERY"
         case .gpsSignal: "GPS"
         case .gpsAccuracy: "GPS ±"
@@ -169,13 +228,19 @@ nonisolated enum WatchDataField: String, CaseIterable, Codable, Identifiable, Se
         let units = WatchFormat.units
         switch self {
         case .duration, .movingTime, .lapTime, .timeOfDay, .eta, .nextWaypoint, .timeToWaypoint, .timeToSunrise, .timeToSunset, .sunrise, .sunset: return ""
-        case .distance, .lapDistance, .remainingDistance, .routeDistance: return units.distanceUnit
-        case .pace, .averagePace, .lapPace, .gradeAdjustedPace, .bestPace: return units.paceUnit
+        case .pausedTime, .averageLapTime, .lastLapTime, .timeInZone, .steps, .latitude, .longitude: return ""
+        case .strokes, .poolLengths, .swolf, .lastLengthTime: return ""
+        case .strokeRate: return "spm"
+        case .pressure: return "hPa"
+        case .bearing: return "°"
+        case .distance, .lapDistance, .remainingDistance, .routeDistance, .lastLapDistance, .distanceToStart: return units.distanceUnit
+        case .pace, .averagePace, .lapPace, .gradeAdjustedPace, .bestPace, .lastLapPace: return units.paceUnit
         case .speed, .averageSpeed, .maxSpeed: return units.speedUnit
-        case .heartRate, .averageHeartRate, .maxHeartRate: return "bpm"
+        case .heartRate, .averageHeartRate, .maxHeartRate, .lapHeartRate, .lastLapHeartRate: return "bpm"
         case .heartRateZone: return ""
-        case .percentMaxHeartRate, .grade, .routeProgress: return "%"
-        case .altitude, .ascent, .descent, .remainingAscent: return units.elevationUnit
+        case .percentMaxHeartRate, .grade, .routeProgress, .percentHeartRateReserve: return "%"
+        case .altitude, .ascent, .descent, .remainingAscent, .lapAscent, .lastLapAscent,
+             .maxAltitude, .minAltitude, .remainingDescent, .routeAscent: return units.elevationUnit
         case .distanceToWaypoint, .offCourse: return units.shortDistanceUnit
         case .verticalSpeed: return units.verticalSpeedUnit
         case .calories: return "kcal"
@@ -192,14 +257,18 @@ nonisolated enum WatchDataField: String, CaseIterable, Codable, Identifiable, Se
 
     var group: WatchFieldGroup {
         switch self {
-        case .duration, .movingTime, .lapTime, .timeOfDay: .time
-        case .distance, .lapDistance, .remainingDistance: .distance
-        case .pace, .averagePace, .lapPace, .gradeAdjustedPace, .bestPace, .speed, .averageSpeed, .maxSpeed: .pace
-        case .heartRate, .averageHeartRate, .maxHeartRate, .heartRateZone, .percentMaxHeartRate: .heart
-        case .altitude, .ascent, .descent, .grade, .verticalSpeed, .remainingAscent: .elevation
-        case .calories, .trainingEffect, .power, .cadence, .averageCadence, .strideLength: .effort
-        case .lapCount, .eta, .distanceToWaypoint, .nextWaypoint, .offCourse, .timeToWaypoint, .routeProgress, .routeDistance: .navigation
+        case .duration, .movingTime, .lapTime, .timeOfDay, .pausedTime, .averageLapTime, .lastLapTime: .time
+        case .distance, .lapDistance, .remainingDistance, .lastLapDistance: .distance
+        case .pace, .averagePace, .lapPace, .gradeAdjustedPace, .bestPace, .speed, .averageSpeed, .maxSpeed, .lastLapPace: .pace
+        case .heartRate, .averageHeartRate, .maxHeartRate, .heartRateZone, .percentMaxHeartRate,
+             .lapHeartRate, .lastLapHeartRate, .timeInZone, .percentHeartRateReserve: .heart
+        case .altitude, .ascent, .descent, .grade, .verticalSpeed, .remainingAscent,
+             .lapAscent, .lastLapAscent, .maxAltitude, .minAltitude, .remainingDescent, .routeAscent, .pressure: .elevation
+        case .calories, .trainingEffect, .power, .cadence, .averageCadence, .strideLength, .steps: .effort
+        case .lapCount, .eta, .distanceToWaypoint, .nextWaypoint, .offCourse, .timeToWaypoint, .routeProgress, .routeDistance,
+             .bearing, .latitude, .longitude, .distanceToStart: .navigation
         case .sunrise, .sunset, .timeToSunrise, .timeToSunset: .daylight
+        case .strokes, .strokeRate, .poolLengths, .swolf, .lastLengthTime: .swim
         case .battery, .gpsSignal, .gpsAccuracy: .system
         }
     }
@@ -207,7 +276,8 @@ nonisolated enum WatchDataField: String, CaseIterable, Codable, Identifiable, Se
     /// Fields that only make sense when a route is loaded.
     var requiresRoute: Bool {
         switch self {
-        case .remainingDistance, .eta, .distanceToWaypoint, .nextWaypoint, .offCourse, .timeToWaypoint, .routeProgress, .routeDistance, .remainingAscent: true
+        case .remainingDistance, .eta, .distanceToWaypoint, .nextWaypoint, .offCourse, .timeToWaypoint,
+             .routeProgress, .routeDistance, .remainingAscent, .remainingDescent, .routeAscent: true
         default: false
         }
     }
@@ -276,6 +346,32 @@ nonisolated enum WatchDataField: String, CaseIterable, Codable, Identifiable, Se
         case .timeToSunrise: metrics.sunrise.map { WatchFormat.duration(max(0, $0.timeIntervalSinceNow)) } ?? "--:--"
         case .timeToSunset: metrics.sunset.map { WatchFormat.duration(max(0, $0.timeIntervalSinceNow)) } ?? "--:--"
         case .remainingAscent: metrics.remainingAscent > 0 ? WatchFormat.elevation(metrics.remainingAscent) : "--"
+        case .remainingDescent: metrics.remainingDescent > 0 ? WatchFormat.elevation(metrics.remainingDescent) : "--"
+        case .routeAscent: metrics.routeAscent > 0 ? WatchFormat.elevation(metrics.routeAscent) : "--"
+        case .pausedTime: WatchFormat.duration(metrics.pausedTime)
+        case .averageLapTime: metrics.averageLapTime > 0 ? WatchFormat.duration(metrics.averageLapTime) : "--:--"
+        case .lastLapTime: metrics.lastLapDuration > 0 ? WatchFormat.duration(metrics.lastLapDuration) : "--:--"
+        case .lastLapDistance: metrics.lastLapDuration > 0 ? WatchFormat.distance(metrics.lastLapDistance) : "--"
+        case .lastLapPace: metrics.lastLapPace > 0 ? WatchFormat.pace(metrics.lastLapPace) : "--:--"
+        case .lapHeartRate: metrics.lapHeartRate > 0 ? WatchFormat.integer(metrics.lapHeartRate) : "--"
+        case .lastLapHeartRate: metrics.lastLapHeartRate > 0 ? WatchFormat.integer(metrics.lastLapHeartRate) : "--"
+        case .timeInZone: metrics.heartRate > 0 ? WatchFormat.duration(metrics.timeInCurrentZone) : "--:--"
+        case .percentHeartRateReserve: metrics.percentHeartRateReserve.map { WatchFormat.percent($0) } ?? "--"
+        case .lapAscent: WatchFormat.elevation(metrics.lapAscent)
+        case .lastLapAscent: metrics.lastLapDuration > 0 ? WatchFormat.elevation(metrics.lastLapAscent) : "--"
+        case .maxAltitude: metrics.maxAltitude.map { WatchFormat.elevation($0) } ?? "--"
+        case .minAltitude: metrics.minAltitude.map { WatchFormat.elevation($0) } ?? "--"
+        case .pressure: metrics.pressure > 0 ? WatchFormat.integer(metrics.pressure) : "--"
+        case .steps: WatchFormat.integer(metrics.steps)
+        case .bearing: metrics.hasPosition ? WatchFormat.integer(metrics.bearing) : "--"
+        case .latitude: metrics.hasPosition ? WatchFormat.decimal(metrics.latitude, places: 4) : "--"
+        case .longitude: metrics.hasPosition ? WatchFormat.decimal(metrics.longitude, places: 4) : "--"
+        case .distanceToStart: metrics.hasPosition ? WatchFormat.distance(metrics.distanceToStart) : "--"
+        case .strokes: metrics.strokes > 0 ? WatchFormat.integer(metrics.strokes) : "--"
+        case .strokeRate: metrics.strokeRate > 0 ? WatchFormat.integer(metrics.strokeRate) : "--"
+        case .poolLengths: metrics.poolLengths > 0 ? "\(metrics.poolLengths)" : "--"
+        case .swolf: metrics.swolf > 0 ? WatchFormat.integer(metrics.swolf) : "--"
+        case .lastLengthTime: metrics.lastLengthSeconds > 0 ? WatchFormat.duration(metrics.lastLengthSeconds) : "--:--"
         case .battery: WatchFormat.percent(metrics.batteryFraction)
         // Three bars of signal, or plain words when there is none to report.
         case .gpsSignal: metrics.isGPSLive ? "\(max(0, min(3, metrics.gpsBars)))/3" : "--"
@@ -328,6 +424,32 @@ nonisolated enum WatchDataField: String, CaseIterable, Codable, Identifiable, Se
         case .timeToSunrise: "9:24"
         case .timeToSunset: "3:26"
         case .remainingAscent: "438"
+        case .remainingDescent: "512"
+        case .routeAscent: "1080"
+        case .pausedTime: "2:14"
+        case .averageLapTime: "6:01"
+        case .lastLapTime: "5:58"
+        case .lastLapDistance: "1.00"
+        case .lastLapPace: "5:58"
+        case .lapHeartRate: "151"
+        case .lastLapHeartRate: "149"
+        case .timeInZone: "18:40"
+        case .percentHeartRateReserve: "74"
+        case .lapAscent: "64"
+        case .lastLapAscent: "58"
+        case .maxAltitude: "1402"
+        case .minAltitude: "860"
+        case .pressure: "1013"
+        case .steps: "8420"
+        case .bearing: "142"
+        case .latitude: "51.4779"
+        case .longitude: "-0.0015"
+        case .distanceToStart: "3.20"
+        case .strokes: "412"
+        case .strokeRate: "32"
+        case .poolLengths: "24"
+        case .swolf: "38"
+        case .lastLengthTime: "0:22"
         case .battery: "78"
         case .gpsSignal: "3/3"
         case .gpsAccuracy: "6"

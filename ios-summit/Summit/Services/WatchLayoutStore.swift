@@ -38,6 +38,10 @@ final class WatchLayoutStore {
     /// Works out a way back to the route whenever you go off course.
     var isReroutingEnabled: Bool = true { didSet { persist() } }
     var maxHeartRate: Int = 188 { didSet { persist() } }
+    /// Length of the pool, in metres. HealthKit cannot count lengths without
+    /// being told how long one is, so this is what makes lengths and SWOLF
+    /// possible at all — there is no way to infer it from the wrist.
+    var poolLengthMetres: Double = 25 { didSet { persist() } }
     /// Colour of the planned course line, on both devices.
     var routeTrailColor: TrailColor = .orange {
         didSet {
@@ -241,6 +245,7 @@ final class WatchLayoutStore {
         usesWaterLock = payload.usesWaterLock ?? usesWaterLock
         confirmsWorkoutEnd = payload.confirmsWorkoutEnd ?? confirmsWorkoutEnd
         maxHeartRate = payload.maxHeartRate
+        poolLengthMetres = payload.poolLengthMetres ?? poolLengthMetres
         unitSystem = payload.unitSystem.flatMap(UnitSystem.init(rawValue:)) ?? unitSystem
         routeTrailColor = TrailColor.resolve(payload.routeTrailColor) ?? routeTrailColor
         breadcrumbTrailColor = TrailColor.resolve(payload.breadcrumbTrailColor) ?? breadcrumbTrailColor
@@ -306,6 +311,7 @@ final class WatchLayoutStore {
         var metricTypeface: String?
         var fieldTint: String?
         var metricWeight: String?
+        var poolLengthMetres: Double?
     }
 
     private var recents: [String] = []
@@ -332,6 +338,7 @@ final class WatchLayoutStore {
         usesWaterLock = payload.usesWaterLock ?? true
         confirmsWorkoutEnd = payload.confirmsWorkoutEnd ?? true
         maxHeartRate = payload.maxHeartRate
+        poolLengthMetres = payload.poolLengthMetres ?? 25
         unitSystem = payload.unitSystem.flatMap(UnitSystem.init(rawValue:)) ?? .deviceDefault
         usesNavigationAlerts = payload.usesNavigationAlerts ?? true
         isReroutingEnabled = payload.isReroutingEnabled ?? true
@@ -365,7 +372,8 @@ final class WatchLayoutStore {
             breadcrumbTrailColor: breadcrumbTrailColor.rawValue,
             metricTypeface: metricTypeface,
             fieldTint: fieldTint,
-            metricWeight: metricWeight
+            metricWeight: metricWeight,
+            poolLengthMetres: poolLengthMetres
         )
         return try? JSONEncoder().encode(payload)
     }

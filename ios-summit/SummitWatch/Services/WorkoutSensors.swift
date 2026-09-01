@@ -1,5 +1,6 @@
 import Foundation
 import CoreLocation
+import CoreMotion
 import HealthKit
 
 /// A location reading reduced to plain values so it can cross isolation
@@ -76,6 +77,12 @@ final class WorkoutSensors: NSObject, CLLocationManagerDelegate, HKWorkoutSessio
     var onPower: ((Double) -> Void)?
     /// Cumulative step count, from which running cadence is derived.
     var onStepTotal: ((Double) -> Void)?
+    /// Air pressure in kilopascals, straight from the watch's barometer.
+    var onPressure: ((Double) -> Void)?
+    /// Cumulative swim stroke count, from which stroke rate is derived.
+    var onStrokeTotal: ((Double) -> Void)?
+    /// One completed pool length, as segmented by HealthKit.
+    var onLengthCompleted: (() -> Void)?
 
     private let locationManager = CLLocationManager()
     private let healthStore = HKHealthStore()
@@ -83,6 +90,11 @@ final class WorkoutSensors: NSObject, CLLocationManagerDelegate, HKWorkoutSessio
     private var builder: HKLiveWorkoutBuilder?
     private var dataSource: HKLiveWorkoutDataSource?
     private var isPowerSaving = false
+    private let altimeter = CMAltimeter()
+    private var isReadingPressure = false
+    /// Lap events already reported, so a length is counted once. The builder
+    /// hands back the whole event list each time, not just the new entries.
+    private var countedLapEvents = 0
 
     override init() {
         super.init()
@@ -115,6 +127,7 @@ final class WorkoutSensors: NSObject, CLLocationManagerDelegate, HKWorkoutSessio
         for identifier in Self.workoutQuantities {
             share.insert(HKQuantityType(identifier))
         }
+        share.insert(HKQuantityType(.swimmingStrokeCount))
 
         var read: Set<HKObjectType> = [
             HKObjectType.workoutType(),
@@ -139,6 +152,7 @@ final class WorkoutSensors: NSObject, CLLocationManagerDelegate, HKWorkoutSessio
         .distanceWalkingRunning, .distanceCycling, .distanceSwimming,
         .distanceDownhillSnowSports, .stepCount, .flightsClimbed,
         .runningSpeed, .runningPower, .cyclingSpeed, .cyclingPower, .cyclingCadence,
+        .swimmingStrokeCount,
     ]
 
     /// Recovery types the watch only reads.
@@ -149,14 +163,38 @@ final class WorkoutSensors: NSObject, CLLocationManagerDelegate, HKWorkoutSessio
 
     // MARK: - Lifecycle
 
-    func start(sport: WatchSport, isPowerSaving: Bool) async {
+    func start(sport: WatchSport, isPowerSaving: Bool, poolLengthMetres: Double) async {
         self.isPowerSaving = isPowerSaving
+        countedLapEvents = 0
         if sport.usesGPS {
             locationManager.requestWhenInUseAuthorization()
             applyLocationPowerMode()
             locationManager.startUpdatingLocation()
         }
-        await startWorkoutSession(sport: sport)
+        // The barometer is cheap and works indoors, where GPS altitude does not.
+        // Power saver leaves it off: pressure is a nicety, not a recording.
+        if !isPowerSaving { startPressureUpdates() }
+        await startWorkoutSession(sport: sport, poolLengthMetres: poolLengthMetres)
+    }
+
+    /// Reads the watch's barometer.
+    ///
+    /// Reported in kilopascals and converted to hectopascals by the engine,
+    /// which is the unit every weather forecast and storm warning is quoted in.
+    private func startPressureUpdates() {
+        guard CMAltimeter.isRelativeAltitudeAvailable(), !isReadingPressure else { return }
+        isReadingPressure = true
+        altimeter.startRelativeAltitudeUpdates(to: .main) { [weak self] data, _ in
+            guard let data else { return }
+            let kilopascals = data.pressure.doubleValue
+            Task { @MainActor [weak self] in self?.onPressure?(kilopascals) }
+        }
+    }
+
+    private func stopPressureUpdates() {
+        guard isReadingPressure else { return }
+        isReadingPressure = false
+        altimeter.stopRelativeAltitudeUpdates()
     }
 
     /// Turns the two heaviest sensors up or down mid-workout.
@@ -167,6 +205,11 @@ final class WorkoutSensors: NSObject, CLLocationManagerDelegate, HKWorkoutSessio
         guard isPowerSaving != enabled else { return }
         isPowerSaving = enabled
         applyLocationPowerMode()
+        if enabled {
+            stopPressureUpdates()
+        } else {
+            startPressureUpdates()
+        }
 
         let heartRate = HKQuantityType(.heartRate)
         if enabled {
@@ -193,6 +236,7 @@ final class WorkoutSensors: NSObject, CLLocationManagerDelegate, HKWorkoutSessio
 
     func stop() async {
         locationManager.stopUpdatingLocation()
+        stopPressureUpdates()
         dataSource = nil
         guard let session, let builder else { return }
         session.end()
@@ -205,6 +249,7 @@ final class WorkoutSensors: NSObject, CLLocationManagerDelegate, HKWorkoutSessio
     /// Discards the in-flight workout without writing it to Health.
     func discard() async {
         locationManager.stopUpdatingLocation()
+        stopPressureUpdates()
         session?.end()
         builder?.discardWorkout()
         session = nil
@@ -212,11 +257,17 @@ final class WorkoutSensors: NSObject, CLLocationManagerDelegate, HKWorkoutSessio
         dataSource = nil
     }
 
-    private func startWorkoutSession(sport: WatchSport) async {
+    private func startWorkoutSession(sport: WatchSport, poolLengthMetres: Double) async {
         guard HKHealthStore.isHealthDataAvailable() else { return }
         let configuration = HKWorkoutConfiguration()
         configuration.activityType = sport.healthKitActivity
         configuration.locationType = sport.isIndoor ? .indoor : .outdoor
+        // Lengths cannot be counted without knowing how long one is, and SWOLF
+        // is built on lengths — so this single value is what makes pool
+        // swimming metrics possible at all.
+        if sport == .poolSwim, poolLengthMetres > 0 {
+            configuration.lapLength = HKQuantity(unit: .meter(), doubleValue: poolLengthMetres)
+        }
 
         do {
             let session = try HKWorkoutSession(healthStore: healthStore, configuration: configuration)
@@ -320,6 +371,12 @@ final class WorkoutSensors: NSObject, CLLocationManagerDelegate, HKWorkoutSessio
                 }
             case HKQuantityType(.runningPower), HKQuantityType(.cyclingPower):
                 power = statistics.mostRecentQuantity()?.doubleValue(for: .watt())
+            case HKQuantityType(.swimmingStrokeCount):
+                // Cumulative, like steps: the engine turns the running total
+                // into a rate and into strokes per length.
+                if let strokes = statistics.sumQuantity()?.doubleValue(for: .count()) {
+                    Task { @MainActor [weak self] in self?.onStrokeTotal?(strokes) }
+                }
             default:
                 continue
             }
@@ -335,5 +392,16 @@ final class WorkoutSensors: NSObject, CLLocationManagerDelegate, HKWorkoutSessio
         }
     }
 
-    nonisolated func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {}
+    /// Pool lengths arrive as lap events once the configuration carries a lap
+    /// length. The whole event list comes back each time, so only the entries
+    /// beyond the ones already seen are new.
+    nonisolated func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {
+        let lapCount = workoutBuilder.workoutEvents.filter { $0.type == .lap }.count
+        Task { @MainActor [weak self] in
+            guard let self, lapCount > countedLapEvents else { return }
+            let newLengths = lapCount - countedLapEvents
+            countedLapEvents = lapCount
+            for _ in 0..<newLengths { onLengthCompleted?() }
+        }
+    }
 }

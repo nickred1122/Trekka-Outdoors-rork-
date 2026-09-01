@@ -75,6 +75,10 @@ final class WatchScreenSettings {
             persist()
         }
     }
+    /// Length of the pool, in metres. HealthKit cannot count lengths without
+    /// being told how long one is, so this is what makes lengths and SWOLF
+    /// possible at all — there is no way to infer it from the wrist.
+    var poolLengthMetres: Double = 25 { didSet { persist() } }
     /// Metric or imperial. Mirrored into `WatchFormat` so every cell, banner and
     /// summary on the wrist converts the same way.
     var unitSystem: UnitSystem = .deviceDefault {
@@ -279,6 +283,7 @@ final class WatchScreenSettings {
         fieldTint = payload.fieldTint.flatMap(FieldTint.init(rawValue:)) ?? fieldTint
         metricWeight = payload.metricWeight.flatMap(MetricWeightChoice.init(rawValue:)) ?? metricWeight
         maxHeartRate = payload.maxHeartRate
+        poolLengthMetres = payload.poolLengthMetres ?? poolLengthMetres
         unitSystem = payload.unitSystem.flatMap(UnitSystem.init(rawValue:)) ?? unitSystem
         LiveMetrics.maxHeartRateCeiling = Double(maxHeartRate)
         WatchFormat.units = unitSystem
@@ -326,6 +331,7 @@ final class WatchScreenSettings {
         var metricTypeface: String?
         var fieldTint: String?
         var metricWeight: String?
+        var poolLengthMetres: Double?
     }
 
     private func load() {
@@ -354,6 +360,7 @@ final class WatchScreenSettings {
         fieldTint = payload.fieldTint.flatMap(FieldTint.init(rawValue:)) ?? .auto
         metricWeight = payload.metricWeight.flatMap(MetricWeightChoice.init(rawValue:)) ?? .standard
         maxHeartRate = payload.maxHeartRate
+        poolLengthMetres = payload.poolLengthMetres ?? 25
         unitSystem = payload.unitSystem.flatMap(UnitSystem.init(rawValue:)) ?? .deviceDefault
     }
 
@@ -383,7 +390,8 @@ final class WatchScreenSettings {
             breadcrumbTrailColor: breadcrumbTrailColor.rawValue,
             metricTypeface: metricTypeface.rawValue,
             fieldTint: fieldTint.rawValue,
-            metricWeight: metricWeight.rawValue
+            metricWeight: metricWeight.rawValue,
+            poolLengthMetres: poolLengthMetres
         )
         guard let data = try? JSONEncoder().encode(payload) else { return }
         UserDefaults.standard.set(data, forKey: defaultsKey)

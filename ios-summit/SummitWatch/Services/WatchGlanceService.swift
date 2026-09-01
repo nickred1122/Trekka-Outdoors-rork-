@@ -75,6 +75,10 @@ final class WatchGlanceService {
         }
         if let measuredResting, measuredResting > 0 {
             restingHeartRate = measuredResting
+            // Heart rate reserve needs the heart's real floor, and this is the
+            // one place that reads it. Published so a workout can score effort
+            // against the measured range rather than an assumed one.
+            LiveMetrics.restingHeartRateFloor = measuredResting
             didRead = true
         }
         if let baseline = await baselineValue, baseline > 0 {
