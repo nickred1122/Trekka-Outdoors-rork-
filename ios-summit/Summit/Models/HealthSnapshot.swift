@@ -13,6 +13,9 @@ nonisolated struct HealthSnapshot: Sendable, Equatable {
     var activeCalories: Double
     var steps: Int
     var restingHeartRate: Double
+    /// The athlete's own recent average resting rate, so today can be read
+    /// against it rather than against a population figure.
+    var restingBaseline: Double = 0
     var exerciseMinutes: Double
     var flightsClimbed: Double
     var respiratoryRate: Double
@@ -48,6 +51,7 @@ nonisolated struct HealthSnapshot: Sendable, Equatable {
         activeCalories: 0,
         steps: 0,
         restingHeartRate: 0,
+        restingBaseline: 0,
         exerciseMinutes: 0,
         flightsClimbed: 0,
         respiratoryRate: 0,
@@ -87,7 +91,31 @@ nonisolated struct ReadinessFactor: Identifiable, Sendable {
 
 /// Derives a Garmin-style readiness score and caption from recovery inputs.
 nonisolated enum ReadinessCalculator {
-    static func score(sleepSeconds: TimeInterval, sleepScore: Int, hrv: Double, hrvBaseline: Double, load: Int) -> Int {
+    /// How far resting heart rate has to rise above its own baseline before it
+    /// counts as a warning. Below this it is ordinary night-to-night noise.
+    private static let restingDriftThreshold: Double = 3
+
+    /// A raised resting heart rate is the oldest and most reliable overtraining
+    /// signal there is — it climbs before you feel tired, and it climbs when you
+    /// are coming down with something. Measured against your own recent average
+    /// rather than any population figure.
+    static func restingPenalty(resting: Double, baseline: Double) -> Double {
+        guard resting > 0, baseline > 0 else { return 0 }
+        let drift = resting - baseline
+        guard drift > restingDriftThreshold else { return 0 }
+        // Five beats over baseline is a rest day; the scale saturates there.
+        return min(1, (drift - restingDriftThreshold) / 5) * 15
+    }
+
+    static func score(
+        sleepSeconds: TimeInterval,
+        sleepScore: Int,
+        hrv: Double,
+        hrvBaseline: Double,
+        load: Int,
+        restingHeartRate: Double = 0,
+        restingBaseline: Double = 0
+    ) -> Int {
         guard sleepSeconds > 0 || hrv > 0 else { return 0 }
         let sleepHours = sleepSeconds / 3600
         let sleepComponent = min(1.0, sleepHours / 8.0) * 40
@@ -95,7 +123,8 @@ nonisolated enum ReadinessCalculator {
         let hrvComponent = min(1.0, hrvRatio / 1.1) * 35
         let qualityComponent = Double(sleepScore) / 100 * 15
         let loadPenalty = max(0, Double(load) - 500) / 500 * 20
-        let raw = sleepComponent + hrvComponent + qualityComponent + 10 - loadPenalty
+        let restingDrift = restingPenalty(resting: restingHeartRate, baseline: restingBaseline)
+        let raw = sleepComponent + hrvComponent + qualityComponent + 10 - loadPenalty - restingDrift
         return max(1, min(100, Int(raw.rounded())))
     }
 
@@ -142,7 +171,37 @@ nonisolated enum ReadinessCalculator {
                 symbol: "chart.bar.fill",
                 isPenalty: true
             ),
+            ReadinessFactor(
+                title: "Resting heart rate",
+                detail: restingDetail(for: snapshot),
+                points: restingPenalty(
+                    resting: snapshot.restingHeartRate,
+                    baseline: snapshot.restingBaseline
+                ),
+                maxPoints: 15,
+                symbol: "heart.fill",
+                isPenalty: true
+            ),
         ]
+    }
+
+    private static func restingDetail(for snapshot: HealthSnapshot) -> String {
+        guard snapshot.restingHeartRate > 0 else { return "No resting rate recorded" }
+        guard snapshot.restingBaseline > 0 else { return "Baseline still building" }
+        let drift = snapshot.restingHeartRate - snapshot.restingBaseline
+        if drift > restingDriftThreshold {
+            return String(
+                format: "%.0f bpm, %.0f above your %.0f bpm baseline",
+                snapshot.restingHeartRate,
+                drift,
+                snapshot.restingBaseline
+            )
+        }
+        return String(
+            format: "%.0f bpm, in line with your %.0f bpm baseline",
+            snapshot.restingHeartRate,
+            snapshot.restingBaseline
+        )
     }
 
     static func caption(for score: Int) -> String {

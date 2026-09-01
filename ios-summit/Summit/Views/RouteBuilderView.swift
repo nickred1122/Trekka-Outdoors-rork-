@@ -25,6 +25,7 @@ struct RouteBuilderView: View {
     @State private var draftName = ""
     @State private var recenterToken = 0
     @State private var feedback = 0
+    @State private var showsLoopSheet = false
 
     private var mapMode: MapInteractionMode {
         switch draft.tool {
@@ -55,6 +56,15 @@ struct RouteBuilderView: View {
         .animation(.snappy(duration: 0.22), value: draft.tool)
         .sheet(isPresented: $showsProfile) {
             RouteProfileSheet(draft: draft, activity: activity)
+        }
+        .sheet(isPresented: $showsLoopSheet) {
+            if let start = draft.nodes.first?.coordinate {
+                LoopPlannerSheet(draft: draft, start: start) {
+                    recenterToken += 1
+                    feedback += 1
+                }
+                .preferredColorScheme(appearance.colorScheme)
+            }
         }
         .sheet(isPresented: Binding(
             get: { editingNodeID != nil },
@@ -507,6 +517,28 @@ struct RouteBuilderView: View {
             .minimumScaleFactor(0.75)
 
             Spacer(minLength: 0)
+
+            // Only offered once there is a start to leave from. Before that
+            // there is nowhere for a loop to begin.
+            if !draft.nodes.isEmpty {
+                Button {
+                    showsLoopSheet = true
+                    feedback += 1
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.trianglehead.clockwise")
+                            .font(.system(size: 10, weight: .bold))
+                        Text("Loop")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 7)
+                    .foregroundStyle(Theme.accent)
+                    .background(Theme.accent.opacity(0.16), in: .capsule)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Build a loop of a chosen distance from here")
+            }
 
             Button {
                 showsImporter = true

@@ -244,6 +244,8 @@ struct ContentView: View {
             ReadinessDetailView()
         case .zones:
             ZonesDetailView()
+        case .trainingLoad:
+            TrainingLoadView()
         }
     }
 

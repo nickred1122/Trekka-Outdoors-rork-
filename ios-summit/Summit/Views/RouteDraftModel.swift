@@ -273,6 +273,58 @@ final class RouteDraftModel {
         resolveLeg(at: legs.count - 1, from: last.coordinate, to: first.coordinate)
     }
 
+    // MARK: - Generated loops
+
+    /// Progress of a running loop search, 0–1, or nil when none is running.
+    private(set) var loopProgress: Double?
+    /// Set when a generated loop came back mostly as straight lines, so the
+    /// planner can warn that the area has little mapped path network.
+    private(set) var loopNotice: String?
+
+    var isGeneratingLoop: Bool { loopProgress != nil }
+
+    /// Builds a loop of about `targetMetres` starting where the draft does.
+    ///
+    /// Replaces the draft outright, which is why it takes an undo step first:
+    /// this is a big change and it must be possible to back out of it.
+    func generateLoop(
+        from start: CLLocationCoordinate2D,
+        targetMetres: Double,
+        bearingDegrees: Double
+    ) async {
+        guard !isGeneratingLoop else { return }
+        loopProgress = 0
+        loopNotice = nil
+        defer { loopProgress = nil }
+
+        let generated = await RouteLoopGenerator.loop(
+            from: start,
+            targetMetres: targetMetres,
+            bearingDegrees: bearingDegrees,
+            mode: snapMode,
+            onProgress: { [weak self] value in self?.loopProgress = value }
+        )
+
+        guard let generated else {
+            loopNotice = "No loop could be routed from here. Try a shorter distance or another direction."
+            return
+        }
+
+        pushUndo()
+        nodes = generated.nodes.map { Node(coordinate: $0) }
+        legs = generated.legs.map { leg in
+            Leg(
+                points: leg.coordinates,
+                isSnapped: leg.isSnapped,
+                failureReason: leg.failureReason
+            )
+        }
+        if !generated.isMostlyRouted {
+            loopNotice = "Much of this loop is a straight line — there is little mapped path around here. Check it before you rely on it."
+        }
+        sampleElevation()
+    }
+
     /// Whether there is a line to fold back on itself.
     var canOutAndBack: Bool { nodes.count > 1 && !isLoop }
 

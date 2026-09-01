@@ -89,6 +89,9 @@ final class WorkoutTracker {
             if status == .denied { gpsQuality = .denied }
         }
         startTimer()
+        // The phone spends most of a workout in a pocket, so the lock screen is
+        // where these numbers are actually read.
+        LiveActivityService.shared.start(activity: activity, route: route)
     }
 
     func pause() {
@@ -96,12 +99,16 @@ final class WorkoutTracker {
         state = .paused
         timer?.cancel()
         timer = nil
+        // Forced: a pause the athlete just pressed has to show at once, or the
+        // lock screen spends ten seconds insisting the workout is still running.
+        LiveActivityService.shared.update(from: self, force: true)
     }
 
     func resume() {
         guard state == .paused else { return }
         state = .running
         startTimer()
+        LiveActivityService.shared.update(from: self, force: true)
     }
 
     func lap() {
@@ -123,6 +130,7 @@ final class WorkoutTracker {
         timer = nil
         locationProvider.stop()
         state = .finished
+        LiveActivityService.shared.end()
         guard elapsed > 5 else { return nil }
 
         let average = zoneSeconds.enumerated().reduce(0.0) { partial, entry in
@@ -149,6 +157,9 @@ final class WorkoutTracker {
         timer?.cancel()
         timer = nil
         locationProvider.stop()
+        // Discarding a session has to clear the card too, or a workout that was
+        // thrown away carries on glowing on the lock screen.
+        LiveActivityService.shared.end()
         state = .idle
         route = nil
     }
@@ -185,6 +196,10 @@ final class WorkoutTracker {
             zoneSeconds[max(0, min(4, heartRateZone - 1))] += 1
         }
         updateNavigation()
+        // Called every second, but the service only pushes about every ten —
+        // iOS throttles a Live Activity that updates too eagerly, and the clock
+        // on the card ticks itself without being told.
+        LiveActivityService.shared.update(from: self)
     }
 
     /// Feeds in a heart rate from a paired sensor or the watch.

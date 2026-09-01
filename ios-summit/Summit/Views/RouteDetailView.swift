@@ -147,6 +147,10 @@ struct RouteDetailView: View {
                     StatItem(symbol: "clock", label: "Est. time", value: Formatters.compactDuration(route.estimatedDuration), unit: "est"),
                 ])
 
+                RouteWeatherCard(route: route)
+
+                RouteEffortsCard(route: route)
+
                 elevationCard(for: route)
 
                 let climbs = route.climbs

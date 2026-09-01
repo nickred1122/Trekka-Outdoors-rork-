@@ -359,6 +359,14 @@ private actor HealthStore {
         async let caloriesValue = sum(.activeEnergyBurned, unit: .kilocalorie(), start: startOfToday, end: now)
         async let stepsValue = sum(.stepCount, unit: .count(), start: startOfToday, end: now)
         async let restingValue = average(.restingHeartRate, unit: HKUnit.count().unitDivided(by: .minute()), start: weekAgo, end: now)
+        // A month of resting rates is the yardstick today is measured against.
+        // Read over the same window as the HRV baseline so the two agree.
+        async let restingBaselineValue = average(
+            .restingHeartRate,
+            unit: HKUnit.count().unitDivided(by: .minute()),
+            start: calendar.date(byAdding: .day, value: -30, to: now) ?? weekAgo,
+            end: now
+        )
         async let sleepValue = lastNightSleep()
         async let workoutList = workouts(since: calendar.date(byAdding: .day, value: -365, to: now) ?? weekAgo)
 
@@ -385,6 +393,7 @@ private actor HealthStore {
         let calories = await caloriesValue ?? 0
         let steps = await stepsValue ?? 0
         let resting = await restingValue ?? 0
+        let restingBaseline = await restingBaselineValue ?? resting
         let sleep = await sleepValue
         let activities = await workoutList
 
@@ -398,7 +407,9 @@ private actor HealthStore {
             sleepScore: sleepScore,
             hrv: hrv,
             hrvBaseline: hrvBaseline,
-            load: load
+            load: load,
+            restingHeartRate: resting,
+            restingBaseline: restingBaseline
         )
 
         var zoneTotals: [Double] = [0, 0, 0, 0, 0]
@@ -422,6 +433,7 @@ private actor HealthStore {
             activeCalories: calories,
             steps: Int(steps),
             restingHeartRate: resting,
+            restingBaseline: restingBaseline,
             exerciseMinutes: await exerciseValue ?? 0,
             flightsClimbed: await flightsValue ?? 0,
             respiratoryRate: await respiratoryValue ?? 0,

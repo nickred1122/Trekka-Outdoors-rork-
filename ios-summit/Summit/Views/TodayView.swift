@@ -5,6 +5,7 @@ nonisolated enum DashboardDestination: Hashable, Sendable {
     case metric(DashboardMetric)
     case readiness
     case zones
+    case trainingLoad
 }
 
 struct TodayView: View {
@@ -12,6 +13,7 @@ struct TodayView: View {
     @Environment(HealthService.self) private var health
     @Environment(DashboardSettings.self) private var settings
     @Environment(AppearanceSettings.self) private var appearance
+    @Environment(WatchLayoutStore.self) private var watchLayout
     @Binding var pendingWorkoutRoute: PlannedRoute?
     @Binding var showsWorkout: Bool
 
@@ -19,6 +21,9 @@ struct TodayView: View {
     @State private var showsCustomizeSheet = false
     @State private var showsWatchSheet = false
     @State private var tileFeedback = 0
+    /// Built off the main actor, because a year of sessions through two
+    /// exponential averages is not free.
+    @State private var load: TrainingLoadModel?
 
     private var snapshot: HealthSnapshot { health.snapshot }
 
@@ -86,6 +91,13 @@ struct TodayView: View {
                     .buttonStyle(TilePressStyle())
                 }
 
+                if let load, load.isReady {
+                    NavigationLink(value: DashboardDestination.trainingLoad) {
+                        trainingLoadCard(load)
+                    }
+                    .buttonStyle(TilePressStyle())
+                }
+
                 startWorkoutCard
 
                 if settings.showsRecentActivity, let latest = store.latestActivity {
@@ -103,6 +115,7 @@ struct TodayView: View {
             guard let day = window.hourlyDay else { return }
             await health.loadDay(day)
         }
+        .task(id: allActivities.count) { await rebuildLoad() }
         .sensoryFeedback(.selection, trigger: tileFeedback)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -134,6 +147,46 @@ struct TodayView: View {
             }
             .preferredColorScheme(appearance.colorScheme)
         }
+    }
+
+    private func rebuildLoad() async {
+        let activities = allActivities
+        let maximum = Double(watchLayout.maxHeartRate)
+        let resting = snapshot.restingHeartRate
+        load = await Task.detached(priority: .utility) {
+            TrainingLoadModel.build(
+                from: activities,
+                maxHeartRate: maximum,
+                restingHeartRate: resting
+            )
+        }.value
+    }
+
+    /// Fitness and form at a glance, opening the full picture when tapped.
+    private func trainingLoadCard(_ model: TrainingLoadModel) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Training load")
+                    .metricLabelStyle()
+                Text(model.state.title)
+                    .font(.system(.headline, weight: .bold))
+                    .foregroundStyle(Theme.textPrimary)
+                Text("Fitness \(Int(model.fitness.rounded())) · Form \(model.form > 0 ? "+" : "")\(Int(model.form.rounded()))")
+                    .font(.metric(12))
+                    .foregroundStyle(Theme.textPrimary.opacity(0.6))
+            }
+            Spacer(minLength: 0)
+            Sparkline(
+                values: model.recent(60).map(\.fitness),
+                color: Theme.accent
+            )
+            .frame(width: 96, height: 34)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Theme.textPrimary.opacity(0.3))
+        }
+        .padding(14)
+        .panel()
     }
 
     private var header: some View {
