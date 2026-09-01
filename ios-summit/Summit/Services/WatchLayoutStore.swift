@@ -38,6 +38,26 @@ final class WatchLayoutStore {
     /// Works out a way back to the route whenever you go off course.
     var isReroutingEnabled: Bool = true { didSet { persist() } }
     var maxHeartRate: Int = 188 { didSet { persist() } }
+    /// Colour of the planned course line, on both devices.
+    var routeTrailColor: TrailColor = .orange {
+        didSet {
+            TrailStyle.route = routeTrailColor
+            persist()
+        }
+    }
+    /// Colour of the breadcrumb trail of where you have actually been.
+    var breadcrumbTrailColor: TrailColor = .amber {
+        didSet {
+            TrailStyle.breadcrumb = breadcrumbTrailColor
+            persist()
+        }
+    }
+    /// Watch-only type choices, edited here and carried in the same document.
+    /// The phone has no metric cells of its own to restyle, but it is the
+    /// comfortable place to set them up.
+    var metricTypeface: String = "rounded" { didSet { persist() } }
+    var fieldTint: String = "auto" { didSet { persist() } }
+    var metricWeight: String = "standard" { didSet { persist() } }
     /// Metric or imperial, carried in the same document as the layout so the
     /// watch reads its units from exactly the file it reads its pages from.
     var unitSystem: UnitSystem = .deviceDefault { didSet { persist() } }
@@ -49,6 +69,13 @@ final class WatchLayoutStore {
 
     init() {
         load()
+        applyTrailStyle()
+    }
+
+    /// Pushes the line colours into the static holder every map surface reads.
+    private func applyTrailStyle() {
+        TrailStyle.route = routeTrailColor
+        TrailStyle.breadcrumb = breadcrumbTrailColor
     }
 
     // MARK: - Pages
@@ -215,6 +242,12 @@ final class WatchLayoutStore {
         confirmsWorkoutEnd = payload.confirmsWorkoutEnd ?? confirmsWorkoutEnd
         maxHeartRate = payload.maxHeartRate
         unitSystem = payload.unitSystem.flatMap(UnitSystem.init(rawValue:)) ?? unitSystem
+        routeTrailColor = TrailColor.resolve(payload.routeTrailColor) ?? routeTrailColor
+        breadcrumbTrailColor = TrailColor.resolve(payload.breadcrumbTrailColor) ?? breadcrumbTrailColor
+        metricTypeface = payload.metricTypeface ?? metricTypeface
+        fieldTint = payload.fieldTint ?? fieldTint
+        metricWeight = payload.metricWeight ?? metricWeight
+        applyTrailStyle()
         isApplyingRemoteEdit = false
         UserDefaults.standard.set(data, forKey: defaultsKey)
         delivery = .delivered(.now)
@@ -268,6 +301,11 @@ final class WatchLayoutStore {
         var usesNavigationAlerts: Bool?
         var isReroutingEnabled: Bool?
         var unitSystem: String?
+        var routeTrailColor: String?
+        var breadcrumbTrailColor: String?
+        var metricTypeface: String?
+        var fieldTint: String?
+        var metricWeight: String?
     }
 
     private var recents: [String] = []
@@ -297,6 +335,12 @@ final class WatchLayoutStore {
         unitSystem = payload.unitSystem.flatMap(UnitSystem.init(rawValue:)) ?? .deviceDefault
         usesNavigationAlerts = payload.usesNavigationAlerts ?? true
         isReroutingEnabled = payload.isReroutingEnabled ?? true
+        routeTrailColor = TrailColor.resolve(payload.routeTrailColor) ?? .orange
+        breadcrumbTrailColor = TrailColor.resolve(payload.breadcrumbTrailColor) ?? .amber
+        metricTypeface = payload.metricTypeface ?? "rounded"
+        fieldTint = payload.fieldTint ?? "auto"
+        metricWeight = payload.metricWeight ?? "standard"
+        applyTrailStyle()
     }
 
     private func encodedPayload() -> Data? {
@@ -316,7 +360,12 @@ final class WatchLayoutStore {
             confirmsWorkoutEnd: confirmsWorkoutEnd,
             usesNavigationAlerts: usesNavigationAlerts,
             isReroutingEnabled: isReroutingEnabled,
-            unitSystem: unitSystem.rawValue
+            unitSystem: unitSystem.rawValue,
+            routeTrailColor: routeTrailColor.rawValue,
+            breadcrumbTrailColor: breadcrumbTrailColor.rawValue,
+            metricTypeface: metricTypeface,
+            fieldTint: fieldTint,
+            metricWeight: metricWeight
         )
         return try? JSONEncoder().encode(payload)
     }

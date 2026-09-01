@@ -27,6 +27,7 @@ struct WatchSetupView: View {
             sportSection
             pagesSection
             optionsSection
+            appearanceSection
             powerSection
             mirrorSection
             deliverySection
@@ -302,6 +303,108 @@ struct WatchSetupView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Appearance
+
+    /// Line colours and metric type, set here because a phone is a far easier
+    /// place to make a visual choice than a watch — then carried to the wrist in
+    /// the same document as the pages.
+    @ViewBuilder
+    private var appearanceSection: some View {
+        @Bindable var bindableLayout = layout
+
+        Section {
+            trailColorRow(
+                title: "Course line",
+                caption: "The route you planned",
+                selection: $bindableLayout.routeTrailColor
+            )
+            trailColorRow(
+                title: "Your trail",
+                caption: "The breadcrumb behind you",
+                selection: $bindableLayout.breadcrumbTrailColor
+            )
+
+            Picker("Metric typeface", selection: $bindableLayout.metricTypeface) {
+                Text("Rounded").tag("rounded")
+                Text("Instrument").tag("instrument")
+                Text("Classic").tag("classic")
+                Text("Serif").tag("serif")
+            }
+
+            Picker("Metric weight", selection: $bindableLayout.metricWeight) {
+                Text("Light").tag("light")
+                Text("Standard").tag("standard")
+                Text("Heavy").tag("heavy")
+            }
+
+            Picker("Readout colour", selection: $bindableLayout.fieldTint) {
+                Text("Automatic").tag("auto")
+                Text("Plain white").tag("mono")
+                Text("Orange").tag("orange")
+                Text("Amber").tag("amber")
+                Text("Lime").tag("lime")
+                Text("Cyan").tag("cyan")
+                Text("Blue").tag("blue")
+                Text("Violet").tag("violet")
+                Text("Magenta").tag("magenta")
+            }
+        } header: {
+            Text("Colours & type")
+        } footer: {
+            Text("Line colours apply to maps on both devices. Typeface and readout colour apply to the watch's metric screens.")
+        }
+    }
+
+    /// A colour choice shown as colour, not as a list of names.
+    private func trailColorRow(
+        title: String,
+        caption: String,
+        selection: Binding<TrailColor>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .foregroundStyle(Theme.textPrimary)
+                    Text(caption)
+                        .font(.caption)
+                        .foregroundStyle(Theme.textPrimary.opacity(0.55))
+                }
+                Spacer()
+                Text(selection.wrappedValue.title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(selection.wrappedValue.color)
+            }
+
+            HStack(spacing: 10) {
+                ForEach(TrailColor.allCases) { option in
+                    Button {
+                        selection.wrappedValue = option
+                    } label: {
+                        Circle()
+                            .fill(option.color)
+                            .frame(width: 26, height: 26)
+                            .overlay {
+                                Circle()
+                                    .strokeBorder(
+                                        Theme.textPrimary,
+                                        lineWidth: selection.wrappedValue == option ? 2.5 : 0
+                                    )
+                                    .padding(-3)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(option.title)
+                    .accessibilityAddTraits(
+                        selection.wrappedValue == option ? [.isSelected, .isButton] : .isButton
+                    )
+                }
+            }
+            .animation(.snappy(duration: 0.2), value: selection.wrappedValue)
+        }
+        .padding(.vertical, 4)
     }
 
     // MARK: - Power

@@ -355,9 +355,12 @@ struct MapPageView: View {
             HStack(spacing: 7) {
                 Image(systemName: "arrow.up")
                     .font(.watch(14, weight: .black))
-                    .rotationEffect(.degrees(reroute.relativeBearing(heading: heading)))
-                    .animation(.snappy, value: reroute.bearing)
-                    .animation(.snappy, value: heading)
+                    // Bearings wrap at north, so this cannot be a plain
+                    // rotationEffect with an animation on it.
+                    .compassRotation(
+                        degrees: reroute.relativeBearing(heading: heading),
+                        animation: .snappy
+                    )
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(reroute.turnHint(heading: heading))

@@ -38,6 +38,27 @@ final class WatchScreenSettings {
     var routeTrailColor: TrailColor = .orange { didSet { persist() } }
     /// Colour of the breadcrumb trail of where you have actually been.
     var breadcrumbTrailColor: TrailColor = .amber { didSet { persist() } }
+    /// Typeface every metric readout is drawn in.
+    var metricTypeface: MetricTypeface = .rounded {
+        didSet {
+            MetricStyle.typeface = metricTypeface
+            persist()
+        }
+    }
+    /// One colour for every readout, or each page's own judgement.
+    var fieldTint: FieldTint = .auto {
+        didSet {
+            MetricStyle.tint = fieldTint
+            persist()
+        }
+    }
+    /// How thick metric numerals are drawn.
+    var metricWeight: MetricWeightChoice = .standard {
+        didSet {
+            MetricStyle.weight = metricWeight
+            persist()
+        }
+    }
     /// Starts every workout in power saver.
     var isPowerSaverEnabled: Bool = false { didSet { persist() } }
     /// Battery percentage that arms power saver mid-workout. 0 disables it.
@@ -73,6 +94,14 @@ final class WatchScreenSettings {
         load()
         LiveMetrics.maxHeartRateCeiling = Double(maxHeartRate)
         WatchFormat.units = unitSystem
+        applyMetricStyle()
+    }
+
+    /// Pushes the type choices into the static holder every metric cell reads.
+    private func applyMetricStyle() {
+        MetricStyle.typeface = metricTypeface
+        MetricStyle.tint = fieldTint
+        MetricStyle.weight = metricWeight
     }
 
     /// The auto-lap trigger in metres, from a lap length set in the athlete's
@@ -246,10 +275,14 @@ final class WatchScreenSettings {
         showsStatusBadges = payload.showsStatusBadges ?? showsStatusBadges
         routeTrailColor = TrailColor.resolve(payload.routeTrailColor) ?? routeTrailColor
         breadcrumbTrailColor = TrailColor.resolve(payload.breadcrumbTrailColor) ?? breadcrumbTrailColor
+        metricTypeface = payload.metricTypeface.flatMap(MetricTypeface.init(rawValue:)) ?? metricTypeface
+        fieldTint = payload.fieldTint.flatMap(FieldTint.init(rawValue:)) ?? fieldTint
+        metricWeight = payload.metricWeight.flatMap(MetricWeightChoice.init(rawValue:)) ?? metricWeight
         maxHeartRate = payload.maxHeartRate
         unitSystem = payload.unitSystem.flatMap(UnitSystem.init(rawValue:)) ?? unitSystem
         LiveMetrics.maxHeartRateCeiling = Double(maxHeartRate)
         WatchFormat.units = unitSystem
+        applyMetricStyle()
     }
 
     // MARK: - Recents
@@ -290,6 +323,9 @@ final class WatchScreenSettings {
         var showsStatusBadges: Bool?
         var routeTrailColor: String?
         var breadcrumbTrailColor: String?
+        var metricTypeface: String?
+        var fieldTint: String?
+        var metricWeight: String?
     }
 
     private func load() {
@@ -314,6 +350,9 @@ final class WatchScreenSettings {
         showsStatusBadges = payload.showsStatusBadges ?? false
         routeTrailColor = TrailColor.resolve(payload.routeTrailColor) ?? .orange
         breadcrumbTrailColor = TrailColor.resolve(payload.breadcrumbTrailColor) ?? .amber
+        metricTypeface = payload.metricTypeface.flatMap(MetricTypeface.init(rawValue:)) ?? .rounded
+        fieldTint = payload.fieldTint.flatMap(FieldTint.init(rawValue:)) ?? .auto
+        metricWeight = payload.metricWeight.flatMap(MetricWeightChoice.init(rawValue:)) ?? .standard
         maxHeartRate = payload.maxHeartRate
         unitSystem = payload.unitSystem.flatMap(UnitSystem.init(rawValue:)) ?? .deviceDefault
     }
@@ -341,7 +380,10 @@ final class WatchScreenSettings {
             usesPreciseStart: usesPreciseStart,
             showsStatusBadges: showsStatusBadges,
             routeTrailColor: routeTrailColor.rawValue,
-            breadcrumbTrailColor: breadcrumbTrailColor.rawValue
+            breadcrumbTrailColor: breadcrumbTrailColor.rawValue,
+            metricTypeface: metricTypeface.rawValue,
+            fieldTint: fieldTint.rawValue,
+            metricWeight: metricWeight.rawValue
         )
         guard let data = try? JSONEncoder().encode(payload) else { return }
         UserDefaults.standard.set(data, forKey: defaultsKey)

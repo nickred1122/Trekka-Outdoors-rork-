@@ -10,6 +10,9 @@ struct SportSetupView: View {
     @Environment(WorkoutEngine.self) private var engine
 
     @State private var selectedRouteID: UUID?
+    /// Warms the receiver while this screen is open, so the athlete can see the
+    /// signal is good before committing to a workout.
+    @State private var preflight = PreflightLocation()
 
     private var selectedRoute: WatchRoute? {
         guard let selectedRouteID else { return nil }
@@ -26,6 +29,16 @@ struct SportSetupView: View {
 
     var body: some View {
         List {
+            if sport.usesGPS {
+                Section {
+                    gpsStatus
+                        .listRowBackground(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(gpsTint.opacity(0.14))
+                        )
+                }
+            }
+
             Section {
                 Button {
                     // The app root swaps the whole screen over to the workout,
@@ -153,7 +166,63 @@ struct SportSetupView: View {
             if selectedRouteID == nil {
                 selectedRouteID = presetRoute?.id
             }
+            if sport.usesGPS { preflight.start() }
         }
+        .onDisappear { preflight.stop() }
+    }
+
+    private var gpsTint: Color {
+        if preflight.isDenied { return WatchTheme.danger }
+        return preflight.isLocked ? WatchTheme.positive : WatchTheme.textSecondary
+    }
+
+    /// Says plainly whether the receiver is ready, before Start is tapped.
+    private var gpsStatus: some View {
+        HStack(spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(gpsTint.opacity(0.18))
+                    .frame(width: 26, height: 26)
+                Image(systemName: lockSymbol)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(gpsTint)
+                    .contentTransition(.symbolEffect(.replace))
+            }
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(lockTitle)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(WatchTheme.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text(preflight.statusText)
+                    .font(.system(size: 9))
+                    .foregroundStyle(WatchTheme.textSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+
+            Spacer(minLength: 0)
+
+            if !preflight.isDenied {
+                GPSStrengthBadge(bars: preflight.bars, isLive: preflight.isLocked)
+            }
+        }
+        .padding(.vertical, 2)
+        .animation(.snappy, value: preflight.isLocked)
+        .animation(.snappy, value: preflight.isDenied)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(lockTitle). \(preflight.statusText).")
+    }
+
+    private var lockSymbol: String {
+        if preflight.isDenied { return "location.slash.fill" }
+        return preflight.isLocked ? "location.fill" : "location.circle"
+    }
+
+    private var lockTitle: String {
+        if preflight.isDenied { return "No location access" }
+        return preflight.isLocked ? "GPS locked on" : "Finding GPS"
     }
 
     /// Says what tapping Start will actually do, so a held clock is never a

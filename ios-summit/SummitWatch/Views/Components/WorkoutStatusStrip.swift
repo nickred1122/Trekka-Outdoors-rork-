@@ -59,7 +59,7 @@ struct GPSStrengthBadge: View {
     let isLive: Bool
     var isSearching: Bool { !isLive || bars <= 0 }
 
-    @State private var isPulsing = false
+    @State private var isDimmed = false
 
     private var tint: Color {
         if isSearching { return WatchTheme.textSecondary }
@@ -74,21 +74,36 @@ struct GPSStrengthBadge: View {
                     .frame(width: 2.5, height: CGFloat(3 + index * 2))
             }
         }
-        .opacity(isSearching && isPulsing ? 0.35 : 1)
-        .animation(
-            isSearching
-                ? .easeInOut(duration: 1.1).repeatForever(autoreverses: true)
-                : .default,
-            value: isPulsing
-        )
-        .onAppear { isPulsing = true }
+        .opacity(isDimmed ? 0.35 : 1)
+        // Driven by whether the receiver is actually searching, and torn down
+        // when it stops.
+        //
+        // This used to hang a `repeatForever` animation off a flag that was set
+        // once in `onAppear`. A repeating animation keyed on a value that never
+        // changes again cannot be called off: once a fix arrived the bars went
+        // solid but the pulse kept running underneath, and the badge carried on
+        // breathing for the rest of the workout as though still searching.
+        .task(id: isSearching) {
+            guard isSearching else {
+                withAnimation(.easeOut(duration: 0.2)) { isDimmed = false }
+                return
+            }
+            withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
+                isDimmed = true
+            }
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(isSearching ? "Searching for GPS" : "GPS signal \(bars) of 3")
     }
 }
 
-/// The one row that survives every layout choice: the running clock, and
-/// optionally signal and charge.
+/// Exceptions only: paused, power saver, and optionally signal and charge.
+///
+/// There is deliberately no clock here. A floating timer over every page
+/// duplicated the Timer field the athlete had already placed on their own data
+/// screen, competed with the watch's system clock for the same corner, and
+/// covered the map. Elapsed time is a data field like any other now, so it
+/// appears where it was asked for and nowhere else.
 ///
 /// Everything sits hard left. This row shares a line with the watch's own clock,
 /// which owns the top-right corner and cannot be moved, so the strip keeps to
@@ -98,7 +113,6 @@ struct GPSStrengthBadge: View {
 /// the badges here are a choice rather than a fixture — an athlete who has given
 /// them a field slot does not want them overlaying the map as well.
 struct WorkoutStatusStrip: View {
-    let elapsed: TimeInterval
     let isPaused: Bool
     let isAutoPaused: Bool
     let tint: Color
@@ -110,27 +124,38 @@ struct WorkoutStatusStrip: View {
     /// Whether signal and charge ride above the page.
     var showsBadges: Bool = true
 
-    private var stateTint: Color {
-        isPaused || isAutoPaused ? WatchTheme.highlight : tint
+    /// Paused is the one state worth interrupting the page for: a workout that
+    /// has quietly stopped recording looks exactly like one that has not.
+    private var haltedText: String? {
+        if isPaused { return "PAUSED" }
+        if isAutoPaused { return "AUTO PAUSED" }
+        return nil
     }
 
-    private var timerText: String {
-        if isPaused { return "PAUSED" }
-        if isAutoPaused { return "AUTO" }
-        return WatchFormat.duration(elapsed)
+    /// Nothing to report means no strip at all, rather than an empty band of
+    /// gradient sitting over the top of the map.
+    private var hasContent: Bool {
+        haltedText != nil || showsBadges || isPowerSaving
     }
 
     var body: some View {
+        if hasContent {
+            strip
+        }
+    }
+
+    private var strip: some View {
         HStack(spacing: WatchDisplay.isCompact ? 3 : 5) {
-            Circle()
-                .fill(stateTint)
-                .frame(width: 5, height: 5)
-            Text(timerText)
-                .font(.metric(11, weight: .bold))
-                .foregroundStyle(isPaused || isAutoPaused ? WatchTheme.highlight : WatchTheme.textSecondary)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
+            if let haltedText {
+                Circle()
+                    .fill(WatchTheme.highlight)
+                    .frame(width: 5, height: 5)
+                Text(haltedText)
+                    .font(.watch(10, weight: .bold))
+                    .foregroundStyle(WatchTheme.highlight)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
 
             if showsBadges {
                 if usesGPS {
@@ -162,5 +187,6 @@ struct WorkoutStatusStrip: View {
             )
             .allowsHitTesting(false)
         }
+        .accessibilityElement(children: .contain)
     }
 }

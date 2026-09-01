@@ -348,10 +348,23 @@ struct WatchSettingsView: View {
                         }
                     }
                 }
+
+                NavigationLink {
+                    MetricStyleWatchView()
+                } label: {
+                    HStack {
+                        Label("Metric style", systemImage: "textformat.123")
+                            .font(.system(size: 12))
+                        Spacer()
+                        Text(settings.metricTypeface.title)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(settings.fieldTint.swatch)
+                    }
+                }
             } header: {
                 Text("Workout display")
             } footer: {
-                Text("Signal strength, GPS accuracy and battery can all be placed on a data screen as ordinary fields.")
+                Text("Signal strength, GPS accuracy and battery can all be placed on a data screen as ordinary fields. The workout timer is a field too — add it to any screen.")
                     .font(.system(size: 9))
             }
 

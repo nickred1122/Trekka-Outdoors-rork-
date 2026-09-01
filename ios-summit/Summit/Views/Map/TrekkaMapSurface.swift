@@ -115,8 +115,10 @@ struct TrekkaMapSurface: View {
             // the athlete's actual location, which the renderer cannot know on
             // its own the way Apple's map view does.
             position: currentPosition?.coordinate ?? (showsUserLocation ? location.coordinate : nil),
-            routeTint: Theme.accent,
-            trailTint: Theme.highlight
+            // The athlete's chosen line colours, so a course reads the same on
+            // the phone as it does on the wrist.
+            routeTint: TrailStyle.route.color,
+            trailTint: TrailStyle.breadcrumb.color
         )
     }
 }

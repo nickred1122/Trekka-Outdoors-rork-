@@ -46,7 +46,9 @@ struct MetricCell: View {
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(value)
                     .font(.metric(size.valueSize, weight: size == .hero ? .bold : .semibold))
-                    .foregroundStyle(tint)
+                    // The page's own choice unless the athlete has overridden
+                    // every readout with one colour of their own.
+                    .foregroundStyle(MetricStyle.tint.resolve(tint))
                     .lineLimit(1)
                     // The last line of defence: a long value in a short slot
                     // shrinks rather than clipping or pushing the page taller.

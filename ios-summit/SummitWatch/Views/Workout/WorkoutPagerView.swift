@@ -357,7 +357,6 @@ struct WorkoutPagerView: View {
 
     private var statusBar: some View {
         WorkoutStatusStrip(
-            elapsed: engine.metrics.elapsed,
             isPaused: engine.phase == .paused,
             isAutoPaused: engine.isAutoPaused,
             tint: sport.tint,
@@ -475,14 +474,15 @@ struct CompassPageView: View {
                         .offset(y: -dialDiameter * 0.405)
                         .rotationEffect(.degrees(Double(index) * 90))
                 }
-                .rotationEffect(.degrees(-heading))
+                // The dial has to keep turning the short way as the athlete
+                // walks through north, where the heading jumps 359 -> 1.
+                .compassRotation(degrees: -heading)
 
                 Image(systemName: "location.north.fill")
                     .font(.watch(20, weight: .bold))
                     .foregroundStyle(WatchTheme.accent)
             }
             .frame(width: dialDiameter, height: dialDiameter)
-            .animation(.easeOut(duration: 0.35), value: heading)
 
             Text("\(WatchFormat.integer(heading))°")
                 .font(.metric(20, weight: .bold))

@@ -63,9 +63,19 @@ extension View {
 }
 
 extension Font {
-    /// Tabular rounded numerals for every metric readout, sized for this watch.
+    /// Tabular numerals for every metric readout, sized for this watch and drawn
+    /// in the typeface and weight the athlete chose.
+    ///
+    /// Digits stay monospaced whatever the choice: a readout whose width changes
+    /// as the numbers tick shifts everything beside it, and a page that twitches
+    /// once a second is unreadable while moving.
     static func metric(_ size: CGFloat, weight: Font.Weight = .semibold) -> Font {
-        .system(size: WatchDisplay.fontSize(size), weight: weight, design: .rounded).monospacedDigit()
+        .system(
+            size: WatchDisplay.fontSize(size),
+            weight: MetricStyle.weight.apply(weight),
+            design: MetricStyle.typeface.design
+        )
+        .monospacedDigit()
     }
 
     /// Body and label type, sized for this watch. Every point size in the watch
