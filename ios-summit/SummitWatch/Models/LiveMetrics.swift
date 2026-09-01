@@ -13,6 +13,21 @@ nonisolated struct LiveMetrics: Sendable, Equatable {
     var lapDistance: Double = 0
     var lapElapsed: TimeInterval = 0
     var lapCount: Int = 1
+    /// Seconds the clock was stopped, by hand or by auto-pause.
+    var pausedTime: TimeInterval = 0
+    /// Steps taken during this workout, accumulated from HealthKit.
+    var steps: Double = 0
+
+    /// The lap in progress.
+    var lapAscent: Double = 0
+    var lapHeartRate: Double = 0
+
+    /// The lap just completed — the one an athlete compares the current one
+    /// against. Zero until the first lap is banked.
+    var lastLapDuration: TimeInterval = 0
+    var lastLapDistance: Double = 0
+    var lastLapAscent: Double = 0
+    var lastLapHeartRate: Double = 0
 
     var currentSpeed: Double = 0
     var maxSpeed: Double = 0
@@ -34,12 +49,23 @@ nonisolated struct LiveMetrics: Sendable, Equatable {
     var altitude: Double = 0
     var grade: Double = 0
     var verticalSpeed: Double = 0
+    /// Highest and lowest ground reached so far. Optional because sea level is
+    /// a real altitude, so zero cannot double as "not measured yet".
+    var maxAltitude: Double?
+    var minAltitude: Double?
 
     var zoneSeconds: [TimeInterval] = [0, 0, 0, 0, 0]
 
     var remainingDistance: Double = 0
     /// Positive climb still between the athlete and the end of the course.
     var remainingAscent: Double = 0
+    /// Descent still to come on the course.
+    var remainingDescent: Double = 0
+    /// Total climb of the loaded course, end to end.
+    var routeAscent: Double = 0
+    /// Straight-line distance back to where the workout began — the number that
+    /// matters when the weather turns and the plan is abandoned.
+    var distanceToStart: Double = 0
     /// How far along the loaded course the athlete has reached, in metres.
     /// Measured by projecting the current fix onto the course, so it stays
     /// honest even after a detour.
@@ -58,6 +84,14 @@ nonisolated struct LiveMetrics: Sendable, Equatable {
     /// inside the polar day and night where the event does not happen.
     var sunrise: Date?
     var sunset: Date?
+
+    /// Direction of travel in degrees, and the last known position. Mirrored
+    /// here so a bearing or a grid reference can sit on a data screen — reading
+    /// a position aloud is how a rescue party is given somewhere to go.
+    var bearing: Double = 0
+    var latitude: Double = 0
+    var longitude: Double = 0
+    var hasPosition: Bool = false
 
     /// Signal strength 0-3 and whether the receiver is still reporting, mirrored
     /// here so both can be placed on a data screen like any other metric.
@@ -95,6 +129,25 @@ nonisolated struct LiveMetrics: Sendable, Equatable {
 
     var strideLength: Double {
         cadence > 20 ? currentSpeed * 60 / cadence : 0
+    }
+
+    /// Pace of the lap just completed.
+    var lastLapPace: TimeInterval {
+        lastLapDistance > 30 && lastLapDuration > 0
+            ? lastLapDuration / (lastLapDistance / 1000)
+            : 0
+    }
+
+    /// Mean lap time so far, across laps already banked plus the one running.
+    var averageLapTime: TimeInterval {
+        lapCount > 0 ? elapsed / Double(lapCount) : 0
+    }
+
+    /// Time spent in the zone the heart is in right now.
+    var timeInCurrentZone: TimeInterval {
+        let index = heartRateZone - 1
+        guard zoneSeconds.indices.contains(index) else { return 0 }
+        return zoneSeconds[index]
     }
 
     /// Time to the next waypoint at the current speed; 0 when still or none.

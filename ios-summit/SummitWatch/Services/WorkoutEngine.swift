@@ -115,6 +115,8 @@ final class WorkoutEngine {
     /// Where sun times were last computed, so they refresh on travel rather
     /// than on every fix — the answer moves a second of arc per kilometre.
     private var solarAnchor: CLLocationCoordinate2D?
+    /// Where recording actually began, for the straight line home.
+    private var startCoordinate: CLLocationCoordinate2D?
     private var announcedApproachIDs: Set<UUID> = []
     private var announcedArrivalIDs: Set<UUID> = []
 
@@ -436,6 +438,8 @@ final class WorkoutEngine {
         announcedArrivalIDs = []
         laps = []
         track = []
+        startCoordinate = nil
+        solarAnchor = nil
         heartRateSum = 0
         heartRateSamples = 0
         cadenceSum = 0
@@ -628,7 +632,13 @@ final class WorkoutEngine {
             isAutomatic: automatic
         )
         laps.append(lap)
+        metrics.lastLapDuration = lap.duration
+        metrics.lastLapDistance = lap.distance
+        metrics.lastLapAscent = lap.ascent
+        metrics.lastLapHeartRate = lap.averageHeartRate
         metrics.lapCount = laps.count + 1
+        metrics.lapAscent = 0
+        metrics.lapHeartRate = 0
         metrics.lapElapsed = 0
         metrics.lapDistance = 0
         lapHeartRateSum = 0
@@ -804,6 +814,10 @@ final class WorkoutEngine {
         // reading no longer describes now.
         guard seconds >= 5, seconds <= 120, newSteps >= 0 else { return }
 
+        // Banked before the cadence window is judged: a step is a step even when
+        // the gap between readings is too long to derive a rate from.
+        metrics.steps += newSteps
+
         let perMinute = newSteps / seconds * 60
         guard perMinute > 0, perMinute < 300 else { return }
         metrics.cadence = metrics.cadence == 0
@@ -831,13 +845,30 @@ final class WorkoutEngine {
         currentCoordinate = fix.coordinate
         updateSolarTimes(coordinate: fix.coordinate)
 
+        // Position and bearing are readings like any other, so they ride on the
+        // metrics where a data screen can show them.
+        metrics.latitude = fix.latitude
+        metrics.longitude = fix.longitude
+        metrics.hasPosition = true
+        if startCoordinate == nil, phase == .active || phase == .acquiring {
+            startCoordinate = fix.coordinate
+        }
+        if let startCoordinate {
+            metrics.distanceToStart = CLLocation(
+                latitude: startCoordinate.latitude, longitude: startCoordinate.longitude
+            ).distance(from: CLLocation(latitude: fix.latitude, longitude: fix.longitude))
+        }
+
         // Precise start: this is the fix the workout was waiting for.
         if phase == .acquiring, hasTrustedFix {
             lastFix = fix
             beginRecording()
             return
         }
-        if fix.course >= 0 { heading = fix.course }
+        if fix.course >= 0 {
+            heading = fix.course
+            metrics.bearing = fix.course
+        }
         if metrics.altitude == 0, fix.altitude.isFinite {
             metrics.altitude = fix.altitude
             ascentAnchor = fix.altitude
@@ -914,6 +945,7 @@ final class WorkoutEngine {
         metrics.averageHeartRate = heartRateSum / Double(heartRateSamples)
         lapHeartRateSum += bpm
         lapHeartRateSamples += 1
+        metrics.lapHeartRate = lapHeartRateSum / Double(lapHeartRateSamples)
     }
 
     // MARK: - Tick
@@ -939,6 +971,8 @@ final class WorkoutEngine {
         // minutes over a long day out.
         if isAutoPaused { pausedSeconds += 1 }
         metrics.elapsed = max(0, Date().timeIntervalSince(metrics.startDate) - pausedSeconds)
+        metrics.pausedTime = pausedSeconds
+        metrics.lapAscent = max(0, metrics.ascent - lapStartAscent)
 
         // Speed is a reading, not a state: when the receiver stops reporting
         // (which is exactly what standing still looks like) it decays to zero
@@ -1002,6 +1036,8 @@ final class WorkoutEngine {
         let previous = metrics.altitude
         let smoothed = previous == 0 ? raw : previous * 0.7 + raw * 0.3
         metrics.altitude = smoothed
+        metrics.maxAltitude = max(metrics.maxAltitude ?? smoothed, smoothed)
+        metrics.minAltitude = min(metrics.minAltitude ?? smoothed, smoothed)
         if ascentAnchor == 0 { ascentAnchor = smoothed }
 
         let sustained = smoothed - ascentAnchor
@@ -1089,6 +1125,8 @@ final class WorkoutEngine {
         metrics.courseDistance = covered
         metrics.remainingDistance = max(0, route.distance - covered)
         metrics.remainingAscent = WatchRouteMath.ascentRemaining(from: nearest.index, in: route.points)
+        metrics.remainingDescent = WatchRouteMath.descentRemaining(from: nearest.index, in: route.points)
+        metrics.routeAscent = route.elevationGain
 
         if metrics.currentSpeed > 0.4 {
             metrics.etaSeconds = metrics.remainingDistance / metrics.currentSpeed

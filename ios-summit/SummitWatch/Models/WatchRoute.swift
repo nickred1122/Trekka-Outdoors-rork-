@@ -75,6 +75,17 @@ nonisolated enum WatchRouteMath {
         return gain
     }
 
+    /// Descent still between the given point on the route and its end.
+    static func descentRemaining(from index: Int, in points: [WatchRoutePoint]) -> Double {
+        guard points.indices.contains(index) else { return 0 }
+        var drop = 0.0
+        for position in (index + 1)..<points.count {
+            let delta = points[position - 1].elevation - points[position].elevation
+            if delta > 0 { drop += delta }
+        }
+        return drop
+    }
+
     static func cumulativeDistances(of points: [WatchRoutePoint]) -> [Double] {
         guard !points.isEmpty else { return [] }
         var result: [Double] = [0]

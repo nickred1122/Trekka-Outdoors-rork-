@@ -48,13 +48,16 @@ nonisolated struct WatchMetricInfo: Sendable {
 
 /// Every metric that can be placed on a watch data screen.
 nonisolated enum WatchMetric: String, CaseIterable, Codable, Identifiable, Sendable {
-    case duration, movingTime, lapTime, timeOfDay
-    case distance, lapDistance, remainingDistance
-    case pace, averagePace, lapPace, gradeAdjustedPace, bestPace, speed, averageSpeed, maxSpeed
+    case duration, movingTime, lapTime, timeOfDay, pausedTime, averageLapTime, lastLapTime
+    case distance, lapDistance, remainingDistance, lastLapDistance
+    case pace, averagePace, lapPace, gradeAdjustedPace, bestPace, speed, averageSpeed, maxSpeed, lastLapPace
     case heartRate, averageHeartRate, maxHeartRate, heartRateZone, percentMaxHeartRate
+    case lapHeartRate, lastLapHeartRate, timeInZone
     case altitude, ascent, descent, grade, verticalSpeed, remainingAscent
-    case calories, trainingEffect, power, cadence, averageCadence, strideLength
+    case lapAscent, lastLapAscent, maxAltitude, minAltitude, remainingDescent, routeAscent
+    case calories, trainingEffect, power, cadence, averageCadence, strideLength, steps
     case lapCount, eta, distanceToWaypoint, nextWaypoint, offCourse, timeToWaypoint, routeProgress, routeDistance
+    case bearing, latitude, longitude, distanceToStart
     case sunrise, sunset, timeToSunrise, timeToSunset
     case battery, gpsSignal, gpsAccuracy
 
@@ -75,13 +78,16 @@ nonisolated enum WatchMetric: String, CaseIterable, Codable, Identifiable, Senda
         let units = Formatters.units
         switch self {
         case .duration, .movingTime, .lapTime, .timeOfDay, .eta, .nextWaypoint, .timeToWaypoint, .timeToSunrise, .timeToSunset, .sunrise, .sunset: return ""
-        case .distance, .lapDistance, .remainingDistance, .routeDistance: return units.distanceUnit
-        case .pace, .averagePace, .lapPace, .gradeAdjustedPace, .bestPace: return units.paceUnit
+        case .pausedTime, .averageLapTime, .lastLapTime, .timeInZone, .steps, .latitude, .longitude: return ""
+        case .bearing: return "°"
+        case .distance, .lapDistance, .remainingDistance, .routeDistance, .lastLapDistance, .distanceToStart: return units.distanceUnit
+        case .pace, .averagePace, .lapPace, .gradeAdjustedPace, .bestPace, .lastLapPace: return units.paceUnit
         case .speed, .averageSpeed, .maxSpeed: return units.speedUnit
-        case .heartRate, .averageHeartRate, .maxHeartRate: return "bpm"
+        case .heartRate, .averageHeartRate, .maxHeartRate, .lapHeartRate, .lastLapHeartRate: return "bpm"
         case .heartRateZone, .trainingEffect, .lapCount, .gpsSignal: return ""
         case .percentMaxHeartRate, .grade, .battery, .routeProgress: return "%"
-        case .altitude, .ascent, .descent, .remainingAscent: return units.elevationUnit
+        case .altitude, .ascent, .descent, .remainingAscent, .lapAscent, .lastLapAscent,
+             .maxAltitude, .minAltitude, .remainingDescent, .routeAscent: return units.elevationUnit
         case .verticalSpeed: return units.verticalSpeedUnit
         case .calories: return "kcal"
         case .power: return "W"
@@ -93,7 +99,8 @@ nonisolated enum WatchMetric: String, CaseIterable, Codable, Identifiable, Senda
 
     var requiresRoute: Bool {
         switch self {
-        case .remainingDistance, .eta, .distanceToWaypoint, .nextWaypoint, .offCourse, .timeToWaypoint, .routeProgress, .routeDistance, .remainingAscent: true
+        case .remainingDistance, .eta, .distanceToWaypoint, .nextWaypoint, .offCourse, .timeToWaypoint,
+             .routeProgress, .routeDistance, .remainingAscent, .remainingDescent, .routeAscent: true
         default: false
         }
     }
@@ -169,6 +176,25 @@ nonisolated enum WatchMetric: String, CaseIterable, Codable, Identifiable, Senda
         .timeToSunrise: .init(title: "Time to Sunrise", label: "TO SUNRISE", preview: "9:24", group: .daylight),
         .timeToSunset: .init(title: "Daylight Left", label: "DAYLIGHT", preview: "3:26", group: .daylight),
         .remainingAscent: .init(title: "Ascent Left", label: "ASC LEFT", preview: "438", group: .elevation),
+        .remainingDescent: .init(title: "Descent Left", label: "DESC LEFT", preview: "512", group: .elevation),
+        .routeAscent: .init(title: "Route Ascent", label: "ROUTE ASC", preview: "1080", group: .elevation),
+        .lapAscent: .init(title: "Lap Ascent", label: "LAP ASC", preview: "64", group: .elevation),
+        .lastLapAscent: .init(title: "Last Lap Ascent", label: "LAST ASC", preview: "58", group: .elevation),
+        .maxAltitude: .init(title: "Max Elevation", label: "MAX ELEV", preview: "1402", group: .elevation),
+        .minAltitude: .init(title: "Min Elevation", label: "MIN ELEV", preview: "860", group: .elevation),
+        .pausedTime: .init(title: "Paused Time", label: "PAUSED", preview: "2:14", group: .time),
+        .averageLapTime: .init(title: "Avg Lap Time", label: "AVG LAP", preview: "6:01", group: .time),
+        .lastLapTime: .init(title: "Last Lap Time", label: "LAST LAP", preview: "5:58", group: .time),
+        .lastLapDistance: .init(title: "Last Lap Distance", label: "LAST DIST", preview: "1.00", group: .distance),
+        .lastLapPace: .init(title: "Last Lap Pace", label: "LAST PACE", preview: "5:58", group: .pace),
+        .lapHeartRate: .init(title: "Lap Heart Rate", label: "LAP HR", preview: "151", group: .heart),
+        .lastLapHeartRate: .init(title: "Last Lap HR", label: "LAST HR", preview: "149", group: .heart),
+        .timeInZone: .init(title: "Time in Zone", label: "IN ZONE", preview: "18:40", group: .heart),
+        .steps: .init(title: "Steps", label: "STEPS", preview: "8420", group: .effort),
+        .bearing: .init(title: "Bearing", label: "BEARING", preview: "142", group: .navigation),
+        .latitude: .init(title: "Latitude", label: "LAT", preview: "51.4779", group: .navigation),
+        .longitude: .init(title: "Longitude", label: "LON", preview: "-0.0015", group: .navigation),
+        .distanceToStart: .init(title: "Distance to Start", label: "TO START", preview: "3.20", group: .navigation),
         .battery: .init(title: "Battery", label: "BATTERY", preview: "78", group: .system),
         .gpsSignal: .init(title: "GPS Signal", label: "GPS", preview: "Good", group: .system),
         .gpsAccuracy: .init(title: "GPS Accuracy", label: "GPS ±", preview: "4", group: .system),
