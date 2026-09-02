@@ -680,9 +680,35 @@ final class WorkoutEngine {
         WKInterfaceDevice.current().play(.success)
         Task { await sensors.stop() }
         releasePowerSaving()
-        onRecordingEnded?(sport, route?.name ?? sport.title)
-        sendSummaryToPhone()
-        publishFaceState()
+
+        // Everything past this point is bookkeeping the athlete never sees, and
+        // none of it is cheap: handing the workout to the phone copies the whole
+        // track into transfer objects and encodes it, filing the breadcrumb
+        // trail writes it to disk, and the watch face snapshot is more file I/O.
+        // Run in the same breath as the tap, all of that came out of the frames
+        // the screen needed to change, which is what made stopping stutter.
+        //
+        // The numbers are taken now rather than later — copying an array costs
+        // nothing until something writes to it — so resetting the engine in the
+        // meantime cannot alter what gets sent. Only the work waits, and the
+        // summary screen it waits behind shows none of it.
+        let finishedSport = sport
+        let finishedRouteName = route?.name
+        let finishedMetrics = metrics
+        let finishedTrack = track
+
+        Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(320))
+            guard let self else { return }
+            onRecordingEnded?(finishedSport, finishedRouteName ?? finishedSport.title)
+            sendSummaryToPhone(
+                sport: finishedSport,
+                routeName: finishedRouteName,
+                metrics: finishedMetrics,
+                track: finishedTrack
+            )
+            publishFaceState()
+        }
     }
 
     func discard() {
@@ -690,9 +716,17 @@ final class WorkoutEngine {
         ticker = nil
         phase = .idle
         releasePowerSaving()
+        // Cancelling the trail stays immediate. Discarding drops straight back
+        // to the dashboard, and the Trails list is one swipe away there — a
+        // delay here would flash the abandoned trail before removing it.
         onRecordingDiscarded?()
         Task { await sensors.discard() }
-        publishFaceState()
+        // The face snapshot is file I/O and nothing on screen reads it, so it
+        // waits for the dashboard to finish appearing.
+        Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(320))
+            self?.publishFaceState()
+        }
     }
 
     /// Power saver exists to get you home, so it stops when the workout does.
@@ -721,13 +755,18 @@ final class WorkoutEngine {
 
     /// Hands the finished workout back to the paired iPhone over WatchConnectivity.
     /// The phone queues it as an activity even if it is not open right now.
-    private func sendSummaryToPhone() {
+    private func sendSummaryToPhone(
+        sport: WatchSport,
+        routeName: String?,
+        metrics: LiveMetrics,
+        track: [WatchTrackPoint]
+    ) {
         guard metrics.elapsed > 30 else { return }
         let identifier = UUID()
         let summary = WorkoutSummaryTransfer(
             id: identifier,
             sport: sport.rawValue,
-            routeName: route?.name,
+            routeName: routeName,
             startDate: metrics.startDate,
             duration: metrics.elapsed,
             distance: metrics.distance,
@@ -752,7 +791,7 @@ final class WorkoutEngine {
         onFinishedWorkout?(
             ActivityTransfer(
                 id: identifier,
-                name: route?.name ?? "\(sport.title) · Watch",
+                name: routeName ?? "\(sport.title) · Watch",
                 activity: Self.activityKind(for: sport).rawValue,
                 startDate: metrics.startDate,
                 duration: metrics.elapsed,

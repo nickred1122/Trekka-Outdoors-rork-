@@ -65,15 +65,6 @@ struct WorkoutPagerView: View {
                 ScreenDetailEditorView(sport: sport, screenID: screen.id)
             }
         }
-        .confirmationDialog(
-            "Stop this workout?",
-            isPresented: $showsEndConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Save workout") { engine.end() }
-            Button("Discard", role: .destructive) { engine.discard() }
-            Button("Keep going", role: .cancel) {}
-        }
     }
 
     // MARK: - Starting
@@ -150,7 +141,7 @@ struct WorkoutPagerView: View {
             // meant for the map, which on the wrist reads as zoom being dead.
             if !showsMap {
                 pager
-                    .allowsHitTesting(!showsMenu)
+                    .allowsHitTesting(!showsMenu && !showsEndConfirmation)
             }
 
             if showsMap {
@@ -162,6 +153,11 @@ struct WorkoutPagerView: View {
                 menuLayer
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
+
+            if showsEndConfirmation {
+                endConfirmationLayer
+                    .transition(.opacity)
+            }
         }
         .overlay(alignment: .top) { if !showsMenu { statusBar } }
         .overlay(alignment: .bottom) { lapBanner }
@@ -171,17 +167,21 @@ struct WorkoutPagerView: View {
         // Horizontal swipes are the app's own navigation; the vertical page
         // carousel keeps the vertical ones. While the map is being explored the
         // drag belongs to the map alone, or every pan would turn the page too.
-        .simultaneousGesture(sideSwipe, including: isExploringMap ? .none : .all)
+        .simultaneousGesture(
+            sideSwipe,
+            including: isExploringMap || showsEndConfirmation ? .none : .all
+        )
         // The press-and-hold shortcut to the controls has to stand down over the
         // map. It was racing every tap on the map's own buttons, so a quick tap
         // did nothing and only a deliberate hold ever registered — and the map
         // page already has visible buttons for everything it does.
         .simultaneousGesture(
             LongPressGesture(minimumDuration: 0.45).onEnded { _ in openMenu() },
-            including: showsMap ? .none : .all
+            including: showsMap || showsEndConfirmation ? .none : .all
         )
         .animation(.snappy(duration: 0.28), value: showsMap)
         .animation(.snappy(duration: 0.24), value: showsMenu)
+        .animation(.snappy(duration: 0.2), value: showsEndConfirmation)
         .animation(.snappy, value: engine.isPowerSaving)
         .animation(.snappy, value: engine.navigationBanner)
         .animation(.snappy, value: engine.startBanner)
@@ -304,6 +304,90 @@ struct WorkoutPagerView: View {
                 onDismiss: closeMenu
             )
         }
+    }
+
+    /// "Stop this workout?", asked inside the workout rather than over it.
+    ///
+    /// This used to be a system confirmation dialog, and that was the bug. A
+    /// dialog is presented *by* this view, but answering it destroys this view:
+    /// saving swaps the screen for the summary, discarding drops the workout
+    /// entirely and hands the watch back to the dashboard. So the presenter was
+    /// being torn out of the hierarchy midway through its own dismissal, which
+    /// is what left the activity list showing through the fading dialog, then
+    /// stuttering as it caught up. Asked in-tree, the answer and the screen it
+    /// leads to are one change instead of two racing each other.
+    private var endConfirmationLayer: some View {
+        ZStack {
+            WatchTheme.canvas.opacity(0.97).ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: WatchDisplay.spacing(7)) {
+                    VStack(spacing: 1) {
+                        Text("Stop this workout?")
+                            .font(.watch(14, weight: .bold))
+                            .foregroundStyle(WatchTheme.textPrimary)
+                            .multilineTextAlignment(.center)
+                        // What is actually at stake, so "discard" is a decision
+                        // rather than a guess about how much work is on the line.
+                        Text(recordedSoFar)
+                            .font(.metric(11, weight: .semibold))
+                            .foregroundStyle(WatchTheme.textSecondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, WatchDisplay.spacing(4))
+
+                    VStack(spacing: WatchDisplay.spacing(5)) {
+                        endChoice(
+                            title: "Save workout",
+                            tint: WatchTheme.accent,
+                            isFilled: true
+                        ) {
+                            showsEndConfirmation = false
+                            engine.end()
+                        }
+
+                        endChoice(title: "Discard", tint: WatchTheme.danger) {
+                            showsEndConfirmation = false
+                            engine.discard()
+                        }
+
+                        endChoice(title: "Keep going", tint: WatchTheme.textSecondary) {
+                            showsEndConfirmation = false
+                            WKInterfaceDevice.current().play(.click)
+                        }
+                    }
+                }
+                .padding(.horizontal, WatchDisplay.spacing(8))
+                .padding(.bottom, WatchDisplay.spacing(8))
+            }
+        }
+    }
+
+    /// Elapsed time, plus distance when the sport measures any.
+    private var recordedSoFar: String {
+        let elapsed = WatchFormat.duration(engine.metrics.elapsed)
+        guard sport.usesGPS, engine.metrics.distance > 0 else { return "\(elapsed) recorded" }
+        return "\(elapsed) · \(WatchFormat.distance(engine.metrics.distance)) \(settings.unitSystem.distanceUnit)"
+    }
+
+    private func endChoice(
+        title: String,
+        tint: Color,
+        isFilled: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.watch(13, weight: .bold))
+                .foregroundStyle(isFilled ? WatchTheme.canvas : tint)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, WatchDisplay.spacing(8))
+                .background(
+                    isFilled ? tint : WatchTheme.surface,
+                    in: .rect(cornerRadius: WatchTheme.cardRadius)
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
