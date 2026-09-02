@@ -232,7 +232,9 @@ nonisolated enum WatchDataField: String, CaseIterable, Codable, Identifiable, Se
         case .strokes, .poolLengths, .swolf, .lastLengthTime: return ""
         case .strokeRate: return "spm"
         case .pressure: return "hPa"
-        case .bearing: return "°"
+        // The bearing prints its own degrees inside the value ("NE 042"), so a
+        // unit here would set a second one beside it.
+        case .bearing: return ""
         case .distance, .lapDistance, .remainingDistance, .routeDistance, .lastLapDistance, .distanceToStart: return units.distanceUnit
         case .pace, .averagePace, .lapPace, .gradeAdjustedPace, .bestPace, .lastLapPace: return units.paceUnit
         case .speed, .averageSpeed, .maxSpeed: return units.speedUnit

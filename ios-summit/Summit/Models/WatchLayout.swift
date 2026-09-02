@@ -85,7 +85,8 @@ nonisolated enum WatchMetric: String, CaseIterable, Codable, Identifiable, Senda
         case .strokes, .poolLengths, .swolf, .lastLengthTime: return ""
         case .strokeRate: return "spm"
         case .pressure: return "hPa"
-        case .bearing: return "°"
+        // Matches the watch: the bearing carries its own degrees in the value.
+        case .bearing: return ""
         case .distance, .lapDistance, .remainingDistance, .routeDistance, .lastLapDistance, .distanceToStart: return units.distanceUnit
         case .pace, .averagePace, .lapPace, .gradeAdjustedPace, .bestPace, .lastLapPace: return units.paceUnit
         case .speed, .averageSpeed, .maxSpeed: return units.speedUnit
@@ -204,7 +205,7 @@ nonisolated enum WatchMetric: String, CaseIterable, Codable, Identifiable, Senda
         .lastLapHeartRate: .init(title: "Last Lap HR", label: "LAST HR", preview: "149", group: .heart),
         .timeInZone: .init(title: "Time in Zone", label: "IN ZONE", preview: "18:40", group: .heart),
         .steps: .init(title: "Steps", label: "STEPS", preview: "8420", group: .effort),
-        .bearing: .init(title: "Bearing", label: "BEARING", preview: "142", group: .navigation),
+        .bearing: .init(title: "Bearing", label: "BEARING", preview: "SE 142", group: .navigation),
         .latitude: .init(title: "Latitude", label: "LAT", preview: "51.4779", group: .navigation),
         .longitude: .init(title: "Longitude", label: "LON", preview: "-0.0015", group: .navigation),
         .distanceToStart: .init(title: "Distance to Start", label: "TO START", preview: "3.20", group: .navigation),
