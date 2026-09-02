@@ -64,6 +64,9 @@ final class WorkoutEngine {
 
     var currentCoordinate: CLLocationCoordinate2D?
     var heading: Double = 0
+    /// True once the magnetometer has produced a usable reading, after which
+    /// GPS course is ignored entirely.
+    private var hasCompassHeading = false
 
     private let sensors = WorkoutSensors()
     private var ticker: Task<Void, Never>?
@@ -812,6 +815,16 @@ final class WorkoutEngine {
         sensors.onLengthCompleted = { [weak self] in
             self?.completeLength()
         }
+        sensors.onHeading = { [weak self] degrees in
+            guard let self else { return }
+            // The magnetometer is the better source and it is always right
+            // about which way the watch points, so once it speaks it owns the
+            // heading outright and GPS course stops being consulted.
+            hasCompassHeading = true
+            heading = degrees
+            metrics.bearing = degrees
+            metrics.hasHeading = true
+        }
         sensors.onPressure = { [weak self] kilopascals in
             guard let self, kilopascals > 0 else { return }
             // Hectopascals is what every forecast and storm warning is quoted
@@ -936,9 +949,14 @@ final class WorkoutEngine {
             beginRecording()
             return
         }
-        if fix.course >= 0 {
+        // Course over ground is the fallback, not the source. It only exists
+        // while genuinely moving — CoreLocation reports a negative course when
+        // it has none — so a watch without a working magnetometer still gets a
+        // heading on the move, and honestly reports having none when stopped.
+        if !hasCompassHeading, fix.course >= 0 {
             heading = fix.course
             metrics.bearing = fix.course
+            metrics.hasHeading = true
         }
         if metrics.altitude == 0, fix.altitude.isFinite {
             metrics.altitude = fix.altitude

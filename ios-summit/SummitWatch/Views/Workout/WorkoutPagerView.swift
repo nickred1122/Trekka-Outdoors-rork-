@@ -465,6 +465,11 @@ struct CompassPageView: View {
     let metrics: LiveMetrics
     let route: WatchRoute?
 
+    /// Whether a direction has actually been measured, rather than the zero a
+    /// fresh reading starts at — which would point the needle due north and
+    /// look entirely convincing.
+    private var hasHeading: Bool { metrics.hasHeading }
+
     var body: some View {
         VStack(spacing: WatchDisplay.spacing(8)) {
             ZStack {
@@ -479,17 +484,35 @@ struct CompassPageView: View {
                 }
                 // The dial has to keep turning the short way as the athlete
                 // walks through north, where the heading jumps 359 -> 1.
-                .compassRotation(degrees: -heading)
+                .compassRotation(degrees: hasHeading ? -heading : 0)
 
                 Image(systemName: "location.north.fill")
                     .font(.watch(20, weight: .bold))
-                    .foregroundStyle(WatchTheme.accent)
+                    .foregroundStyle(hasHeading ? WatchTheme.accent : WatchTheme.textSecondary)
+                    .opacity(hasHeading ? 1 : 0.4)
             }
             .frame(width: dialDiameter, height: dialDiameter)
 
-            Text("\(WatchFormat.integer(heading))°")
-                .font(.metric(20, weight: .bold))
-                .foregroundStyle(WatchTheme.textPrimary)
+            // The compass point first, because it is what gets said out loud and
+            // what gets matched against a paper map. The degrees are the detail
+            // underneath it, not the headline.
+            if hasHeading {
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Text(WatchFormat.cardinal(heading))
+                        .font(.metric(22, weight: .bold))
+                        .foregroundStyle(WatchTheme.accent)
+                    Text("\(WatchFormat.integer(heading))°")
+                        .font(.metric(16, weight: .semibold))
+                        .foregroundStyle(WatchTheme.textPrimary)
+                }
+            } else {
+                // No invented north. A compass that guesses is worse than one
+                // that admits it cannot read.
+                Text("No compass signal")
+                    .font(.watch(10, weight: .semibold))
+                    .foregroundStyle(WatchTheme.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
 
             if route != nil {
                 HStack(spacing: WatchDisplay.spacing(8)) {

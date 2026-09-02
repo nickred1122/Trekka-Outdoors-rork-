@@ -106,4 +106,28 @@ nonisolated enum WatchFormat {
         guard fraction.isFinite else { return "--" }
         return "\(Int((fraction * 100).rounded()))"
     }
+
+    /// The compass point a bearing falls in: N, NE, E, SE, S, SW, W, NW.
+    ///
+    /// Eight points rather than sixteen, because "NNE" on a wrist at a glance is
+    /// three characters of noise. Nobody navigates off the difference between
+    /// north-northeast and northeast without stopping to look properly.
+    static func cardinal(_ degrees: Double) -> String {
+        guard degrees.isFinite else { return "--" }
+        let points: [String] = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+        let normalised: Double = (degrees.truncatingRemainder(dividingBy: 360) + 360)
+            .truncatingRemainder(dividingBy: 360)
+        // Each point owns 45 degrees centred on itself, so north runs from
+        // 337.5 round to 22.5 rather than starting at zero.
+        let index: Int = Int((normalised / 45).rounded()) % points.count
+        return points[index]
+    }
+
+    /// A bearing written the way it is read aloud: "NE 042".
+    static func bearing(_ degrees: Double) -> String {
+        guard degrees.isFinite else { return "--" }
+        let normalised: Double = (degrees.truncatingRemainder(dividingBy: 360) + 360)
+            .truncatingRemainder(dividingBy: 360)
+        return String(format: "%@ %03d", cardinal(normalised), Int(normalised.rounded()) % 360)
+    }
 }

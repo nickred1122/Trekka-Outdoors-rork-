@@ -18,12 +18,16 @@ struct WatchPreviewMap: View {
     var routeTint: Color = WatchTheme.accent
     var breadcrumbTint: Color = WatchTheme.highlight
     var usesNightSheet: Bool = false
+    /// Lets a finger drag the ground about. Off for cards, which live inside
+    /// scrolling pages and must not swallow the scroll.
+    var allowsPan: Bool = false
 
     var body: some View {
         TrekkaTopoMap(
             overlay: overlay,
             centre: centre,
             spanMetres: spanMetres,
+            allowsPan: allowsPan,
             showsContours: true,
             // A card this small has no room for names.
             showsPlaceLabels: false,

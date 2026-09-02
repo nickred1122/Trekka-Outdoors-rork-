@@ -79,6 +79,12 @@ final class WorkoutSensors: NSObject, CLLocationManagerDelegate, HKWorkoutSessio
     var onStepTotal: ((Double) -> Void)?
     /// Air pressure in kilopascals, straight from the watch's barometer.
     var onPressure: ((Double) -> Void)?
+    /// Which way the watch is pointing, in degrees clockwise from true north.
+    ///
+    /// This is the magnetometer, not GPS. It is the only heading that means
+    /// anything when the athlete is standing still — which is exactly when a
+    /// compass gets looked at.
+    var onHeading: ((Double) -> Void)?
     /// Cumulative swim stroke count, from which stroke rate is derived.
     var onStrokeTotal: ((Double) -> Void)?
     /// One completed pool length, as segmented by HealthKit.
@@ -102,7 +108,14 @@ final class WorkoutSensors: NSObject, CLLocationManagerDelegate, HKWorkoutSessio
         locationManager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
         locationManager.activityType = .fitness
         locationManager.distanceFilter = 5
+        // Two degrees is below what anyone can read off a dial, so the needle
+        // looks live without waking the app for noise.
+        locationManager.headingFilter = 2
+        locationManager.headingOrientation = .faceUp
     }
+
+    /// Whether this watch has a magnetometer at all.
+    var isCompassAvailable: Bool { CLLocationManager.headingAvailable() }
 
     var isLocationAuthorized: Bool {
         switch locationManager.authorizationStatus {
@@ -170,6 +183,13 @@ final class WorkoutSensors: NSObject, CLLocationManagerDelegate, HKWorkoutSessio
             locationManager.requestWhenInUseAuthorization()
             applyLocationPowerMode()
             locationManager.startUpdatingLocation()
+            // The magnetometer draws a fraction of what continuous GPS does, so
+            // it keeps running even in power saver: being able to find north
+            // while stationary is the last thing worth giving up when the
+            // battery is going.
+            if CLLocationManager.headingAvailable() {
+                locationManager.startUpdatingHeading()
+            }
         }
         // The barometer is cheap and works indoors, where GPS altitude does not.
         // Power saver leaves it off: pressure is a nicety, not a recording.
@@ -236,6 +256,7 @@ final class WorkoutSensors: NSObject, CLLocationManagerDelegate, HKWorkoutSessio
 
     func stop() async {
         locationManager.stopUpdatingLocation()
+        locationManager.stopUpdatingHeading()
         stopPressureUpdates()
         dataSource = nil
         guard let session, let builder else { return }
@@ -249,6 +270,7 @@ final class WorkoutSensors: NSObject, CLLocationManagerDelegate, HKWorkoutSessio
     /// Discards the in-flight workout without writing it to Health.
     func discard() async {
         locationManager.stopUpdatingLocation()
+        locationManager.stopUpdatingHeading()
         stopPressureUpdates()
         session?.end()
         builder?.discardWorkout()
@@ -322,6 +344,30 @@ final class WorkoutSensors: NSObject, CLLocationManagerDelegate, HKWorkoutSessio
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         // Transient GPS errors are expected in canyons and forest; the engine
         // keeps running on its last known fix.
+    }
+
+    /// The magnetometer's own reading.
+    ///
+    /// `trueHeading` is only resolved once CoreLocation knows roughly where on
+    /// the planet it is, since magnetic declination depends on position. Before
+    /// that it reports a negative number, and the magnetic reading is the honest
+    /// fallback — a few degrees off true north beats no compass at all.
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+        // A negative accuracy means the reading is not trustworthy at all,
+        // usually because the watch is sitting next to something magnetic.
+        guard newHeading.headingAccuracy >= 0 else { return }
+        let degrees: Double = newHeading.trueHeading >= 0
+            ? newHeading.trueHeading
+            : newHeading.magneticHeading
+        guard degrees >= 0, degrees.isFinite else { return }
+        Task { @MainActor [weak self] in self?.onHeading?(degrees) }
+    }
+
+    /// Lets the system put up its own calibration prompt when the magnetometer
+    /// has drifted. Suppressing it would leave the athlete with a compass that
+    /// is quietly wrong and no way to discover why.
+    nonisolated func locationManagerShouldDisplayHeadingCalibration(_ manager: CLLocationManager) -> Bool {
+        true
     }
 
     // MARK: - HKWorkoutSessionDelegate

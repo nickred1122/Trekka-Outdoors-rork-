@@ -234,9 +234,24 @@ struct MapPageView: View {
     /// reads `true` costs nothing, and on one that was quietly reset is a real
     /// retry — so the ladder covers the page transition without ever letting
     /// go of what it has already won.
-    private func claimCrown() {
+    ///
+    /// `forcing` is the other half of that lesson. Re-asserting `true` on a
+    /// property that already reads `true` is a write SwiftUI is entitled to
+    /// optimise away — which is fine while the claim is genuinely held, and
+    /// useless in the one case that matters: focus quietly moving elsewhere
+    /// while this view still believes it has it. Then every retry in the ladder
+    /// is a no-op and the Crown stays dead forever. Standing down for a single
+    /// turn of the run loop, and only when we already think we hold it, makes
+    /// the next claim a real one without ever leaving focus loose the way the
+    /// old retry loop did.
+    private func claimCrown(forcing: Bool = false) {
         crownClaim?.cancel()
         crownClaim = Task {
+            if forcing, isCrownFocused {
+                isCrownFocused = false
+                await Task.yield()
+                guard !Task.isCancelled else { return }
+            }
             // Spread across the map's 0.28s slide-in, so a claim refused while
             // the outgoing page is still mounted gets asked again after it has
             // actually left.
@@ -318,7 +333,7 @@ struct MapPageView: View {
     /// with no way of telling a broken feature from a lost claim. So the map
     /// admits it, and the chip is the way back.
     private var crownChip: some View {
-        Button { claimCrown() } label: {
+        Button { claimCrown(forcing: true) } label: {
             Label("Crown busy · tap", systemImage: "arrow.clockwise")
                 .font(.watch(9, weight: .bold))
                 .foregroundStyle(WatchTheme.canvas)

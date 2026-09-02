@@ -180,12 +180,22 @@ struct BreadcrumbTrailWatchView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 8) {
-                WatchPreviewMap(
-                    breadcrumb: trail.coordinates,
-                    position: trail.crumbs.last?.coordinate
-                )
-                .frame(height: 120)
-                .clipShape(.rect(cornerRadius: 10))
+                NavigationLink {
+                    ExpandedMapWatchView(
+                        breadcrumb: trail.coordinates,
+                        position: trail.crumbs.last?.coordinate,
+                        title: trail.name
+                    )
+                } label: {
+                    WatchPreviewMap(
+                        breadcrumb: trail.coordinates,
+                        position: trail.crumbs.last?.coordinate
+                    )
+                    .frame(height: 120)
+                    .clipShape(.rect(cornerRadius: 10))
+                    .overlay(alignment: .bottomTrailing) { MapExpandBadge() }
+                }
+                .buttonStyle(.plain)
 
                 VStack(spacing: 5) {
                     WatchStatRow(title: "Distance", value: "\(WatchFormat.distance(trail.distance)) \(WatchFormat.units.distanceUnit)")
@@ -237,12 +247,22 @@ struct RouteDetailWatchView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 8) {
-                WatchPreviewMap(
-                    route: route.coordinates,
-                    waypoints: route.waypoints
-                )
-                .frame(height: 110)
-                .clipShape(.rect(cornerRadius: 10))
+                NavigationLink {
+                    ExpandedMapWatchView(
+                        route: route.coordinates,
+                        waypoints: route.waypoints,
+                        title: route.name
+                    )
+                } label: {
+                    WatchPreviewMap(
+                        route: route.coordinates,
+                        waypoints: route.waypoints
+                    )
+                    .frame(height: 110)
+                    .clipShape(.rect(cornerRadius: 10))
+                    .overlay(alignment: .bottomTrailing) { MapExpandBadge() }
+                }
+                .buttonStyle(.plain)
 
                 VStack(spacing: 5) {
                     WatchStatRow(title: "Distance", value: "\(WatchFormat.distance(route.distance)) \(WatchFormat.units.distanceUnit)")

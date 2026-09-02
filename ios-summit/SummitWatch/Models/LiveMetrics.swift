@@ -105,6 +105,12 @@ nonisolated struct LiveMetrics: Sendable, Equatable {
     var latitude: Double = 0
     var longitude: Double = 0
     var hasPosition: Bool = false
+    /// True once a direction has actually been measured.
+    ///
+    /// Separate from `hasPosition` on purpose: the magnetometer knows which way
+    /// the watch points before GPS has any idea where it is, and a bearing of
+    /// zero is a real reading (due north) rather than an absent one.
+    var hasHeading: Bool = false
 
     /// Signal strength 0-3 and whether the receiver is still reporting, mirrored
     /// here so both can be placed on a data screen like any other metric.

@@ -363,7 +363,7 @@ nonisolated enum WatchDataField: String, CaseIterable, Codable, Identifiable, Se
         case .minAltitude: metrics.minAltitude.map { WatchFormat.elevation($0) } ?? "--"
         case .pressure: metrics.pressure > 0 ? WatchFormat.integer(metrics.pressure) : "--"
         case .steps: WatchFormat.integer(metrics.steps)
-        case .bearing: metrics.hasPosition ? WatchFormat.integer(metrics.bearing) : "--"
+        case .bearing: metrics.hasHeading ? WatchFormat.bearing(metrics.bearing) : "--"
         case .latitude: metrics.hasPosition ? WatchFormat.decimal(metrics.latitude, places: 4) : "--"
         case .longitude: metrics.hasPosition ? WatchFormat.decimal(metrics.longitude, places: 4) : "--"
         case .distanceToStart: metrics.hasPosition ? WatchFormat.distance(metrics.distanceToStart) : "--"
@@ -441,7 +441,7 @@ nonisolated enum WatchDataField: String, CaseIterable, Codable, Identifiable, Se
         case .minAltitude: "860"
         case .pressure: "1013"
         case .steps: "8420"
-        case .bearing: "142"
+        case .bearing: "SE 142"
         case .latitude: "51.4779"
         case .longitude: "-0.0015"
         case .distanceToStart: "3.20"
