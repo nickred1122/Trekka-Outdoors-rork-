@@ -34,6 +34,8 @@ struct BackupView: View {
     @Environment(AppearanceSettings.self) private var appearance
     @Environment(UnitSettings.self) private var units
     @Environment(MapPackStore.self) private var mapPacks
+    @Environment(GoalSettings.self) private var goals
+    @Environment(ProfileSettings.self) private var profile
 
     // Shared with the app itself rather than owned here, so a scheduled backup
     // and this screen are always describing the same thing.
@@ -63,7 +65,9 @@ struct BackupView: View {
             dashboard: dashboard,
             appearance: appearance,
             units: units,
-            mapPacks: mapPacks
+            mapPacks: mapPacks,
+            goals: goals,
+            profile: profile
         )
     }
 

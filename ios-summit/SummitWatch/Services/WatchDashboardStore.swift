@@ -58,6 +58,14 @@ final class WatchDashboardStore {
         snapshot?.readings.first { $0.metric == metric.rawValue }
     }
 
+    /// Today against this metric's daily target, when the athlete set one on the
+    /// phone. Nothing is computed here: the wrist shows what the phone measured.
+    func goal(for metric: WatchDashboardMetric) -> MetricGoalTransfer? {
+        snapshot?.goals?.first { $0.metric == metric.rawValue }
+    }
+
+    var goals: [MetricGoalTransfer] { snapshot?.goals ?? [] }
+
     func isVisible(_ metric: WatchDashboardMetric) -> Bool {
         !preferences.hidden.contains(metric.rawValue)
     }
@@ -149,6 +157,28 @@ final class WatchDashboardStore {
         persistSnapshot()
         persistPreferences()
         UserDefaults.standard.set(lastSyncedAt, forKey: syncedKey)
+        publishGoalFace()
+    }
+
+    /// Hands the first goal the athlete has set to the watch face complication,
+    /// which runs in its own process and can only see the App Group container.
+    private func publishGoalFace() {
+        guard let first = snapshot?.goals?.first else {
+            GoalsFace.clear()
+            return
+        }
+        GoalsFace.save(
+            GoalsFace.Snapshot(
+                metric: first.metric,
+                title: WatchDashboardMetric(rawValue: first.metric)?.title ?? first.metric,
+                symbol: WatchDashboardMetric(rawValue: first.metric)?.symbol ?? "target",
+                valueText: first.valueText,
+                targetText: first.targetText,
+                fraction: first.fraction,
+                streak: first.streak,
+                updatedAt: .now
+            )
+        )
     }
 
     /// Folds a workout just finished on the watch into the local history so the

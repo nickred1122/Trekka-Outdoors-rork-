@@ -11,6 +11,8 @@ struct BackupStores {
     let appearance: AppearanceSettings
     let units: UnitSettings
     let mapPacks: MapPackStore
+    let goals: GoalSettings
+    let profile: ProfileSettings
 }
 
 /// What a restore does with data already on this phone.
@@ -65,7 +67,11 @@ enum BackupArchive {
         AppSettingsArchive(
             dashboard: stores.dashboard.snapshot,
             appearance: stores.appearance.mode.rawValue,
-            units: stores.units.system.rawValue
+            units: stores.units.system.rawValue,
+            goals: stores.goals.snapshot,
+            // Empty rather than "" in the file, so a restore never blanks a name
+            // on the new phone with an absence from the old one.
+            profileName: stores.profile.hasName ? stores.profile.name : nil
         )
     }
 
@@ -82,7 +88,10 @@ enum BackupArchive {
             let count = stores.watchLayout.customizedSportCount
             return count == 0 ? "Default screens" : "\(count) custom sport layout\(count == 1 ? "" : "s")"
         case .appSettings:
-            return "Dashboard, units and appearance"
+            let count = stores.goals.metricsWithGoals.count
+            return count > 0
+                ? "Dashboard, \(count) goal\(count == 1 ? "" : "s"), units and appearance"
+                : "Dashboard, units and appearance"
         }
     }
 
@@ -139,6 +148,12 @@ enum BackupArchive {
             if let system = settings.units.flatMap(UnitSystem.init(rawValue:)) {
                 stores.units.set(system)
                 stores.watchLayout.unitSystem = system
+            }
+            if let goals = settings.goals {
+                stores.goals.restore(goals)
+            }
+            if let name = settings.profileName, !name.isEmpty {
+                stores.profile.setName(name)
             }
             report.append("App settings restored")
         }

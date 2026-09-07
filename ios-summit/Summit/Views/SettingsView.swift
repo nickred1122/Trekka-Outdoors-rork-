@@ -3,6 +3,7 @@ import SwiftUI
 nonisolated enum SettingsDestination: Hashable, Sendable {
     case watch
     case backup
+    case goals
 }
 
 /// Everything that configures Trekka, gathered in one place instead of hiding
@@ -15,10 +16,14 @@ struct SettingsView: View {
     @Environment(AppearanceSettings.self) private var appearance
     @Environment(UnitSettings.self) private var units
     @Environment(MapPackStore.self) private var mapPacks
+    @Environment(ProfileSettings.self) private var profile
+    @Environment(GoalSettings.self) private var goals
     @Binding var path: NavigationPath
 
     @State private var showsHealthSheet = false
     @State private var showsCustomizeSheet = false
+    @State private var draftName = ""
+    @FocusState private var isEditingName: Bool
     @State private var feedback = 0
 
     private var syncedRouteCount: Int {
@@ -31,6 +36,14 @@ struct SettingsView: View {
                 identityCard
 
                 section("Dashboard") {
+                    row(
+                        symbol: "target",
+                        title: "Daily goals",
+                        detail: goalDetail
+                    ) {
+                        path.append(SettingsDestination.goals)
+                    }
+                    divider
                     row(
                         symbol: "square.grid.2x2.fill",
                         title: "Customize tiles",
@@ -175,30 +188,83 @@ struct SettingsView: View {
         .sensoryFeedback(.success, trigger: feedback)
         .sheet(isPresented: $showsHealthSheet) { HealthAccessSheet() }
         .sheet(isPresented: $showsCustomizeSheet) { CustomizeDashboardView() }
+        .onAppear { draftName = profile.name }
+        // Committed when the field loses focus as well as on return, so a name
+        // typed and then scrolled away from is not quietly thrown away.
+        .onChange(of: isEditingName) { _, editing in
+            guard !editing else { return }
+            commitName()
+        }
+    }
+
+    private func commitName() {
+        profile.setName(draftName)
+        draftName = profile.name
+    }
+
+    private var goalDetail: String {
+        let metrics = goals.metricsWithGoals
+        guard let first = metrics.first else { return "None set — tap to add one" }
+        guard let target = goals.target(for: first) else { return "None set — tap to add one" }
+        let extra = metrics.count - 1
+        return extra > 0
+            ? "\(first.goalSummary(target)) · +\(extra) more"
+            : first.goalSummary(target)
     }
 
     // MARK: - Cards
 
+    /// Who the app is for, and what it is called. The name is editable in place
+    /// rather than behind another screen — it is one field, and burying it would
+    /// cost more taps than it saves.
     private var identityCard: some View {
         HStack(spacing: 14) {
-            Image(systemName: "mountain.2.fill")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(Theme.canvas)
-                .frame(width: 52, height: 52)
-                .background(Theme.accent, in: .rect(cornerRadius: 14))
+            Group {
+                if profile.hasName {
+                    Text(initials)
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundStyle(Theme.canvas)
+                } else {
+                    Image(systemName: "mountain.2.fill")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(Theme.canvas)
+                }
+            }
+            .frame(width: 52, height: 52)
+            .background(Theme.accent, in: .rect(cornerRadius: 14))
 
             VStack(alignment: .leading, spacing: 3) {
-                Text("Trekka Outdoors")
+                TextField("Your name", text: $draftName)
                     .font(.system(.title3, weight: .bold))
                     .foregroundStyle(Theme.textPrimary)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .focused($isEditingName)
+                    .onSubmit { commitName() }
                 Text(health.hasHealthData ? "Training data from Apple Health" : "Not connected to Apple Health")
                     .font(.caption)
                     .foregroundStyle(Theme.textPrimary.opacity(0.55))
             }
             Spacer(minLength: 0)
+
+            if isEditingName {
+                Button("Done") {
+                    isEditingName = false
+                }
+                .font(.system(.subheadline, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+            }
         }
         .padding(16)
         .panel()
+        .animation(.snappy(duration: 0.2), value: isEditingName)
+    }
+
+    private var initials: String {
+        let parts = profile.name.split(separator: " ").prefix(2)
+        let letters = parts.compactMap { $0.first }.map(String.init)
+        return letters.isEmpty ? "T" : letters.joined().uppercased()
     }
 
     private var aboutCard: some View {

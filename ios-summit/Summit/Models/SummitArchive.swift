@@ -35,7 +35,7 @@ nonisolated enum BackupSection: String, Codable, CaseIterable, Identifiable, Sen
         case .routes: "Planned and imported routes, with their tracks and waypoints"
         case .activities: "Workouts Trekka recorded, including their GPS tracks"
         case .watchSetup: "Data screens, layouts, alerts, power saver and max heart rate"
-        case .appSettings: "Dashboard tiles, units and appearance"
+        case .appSettings: "Dashboard tiles, daily goals, your name, units and appearance"
         }
     }
 
@@ -61,10 +61,15 @@ nonisolated struct WatchSetupArchive: Codable, Sendable {
 }
 
 /// Everything that configures the phone app itself.
+///
+/// Every field is optional so an archive written by an older build — before
+/// goals or a name existed — still restores everything it does carry.
 nonisolated struct AppSettingsArchive: Codable, Sendable {
     var dashboard: DashboardPreferences?
     var appearance: String?
     var units: String?
+    var goals: DailyGoals?
+    var profileName: String?
 }
 
 /// A snapshot of the athlete's Trekka data, used for both iCloud backups and
@@ -138,8 +143,11 @@ extension SummitArchive {
                 ? "Default screens"
                 : "\(watchSetup.customizedSports) custom sport layout\(watchSetup.customizedSports == 1 ? "" : "s")"
         case .appSettings:
-            guard appSettings != nil else { return nil }
-            return "Dashboard, units and appearance"
+            guard let appSettings else { return nil }
+            let goals = appSettings.goals?.count ?? 0
+            return goals > 0
+                ? "Dashboard, \(goals) goal\(goals == 1 ? "" : "s"), units and appearance"
+                : "Dashboard, units and appearance"
         }
     }
 

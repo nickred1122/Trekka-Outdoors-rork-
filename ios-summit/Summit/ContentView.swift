@@ -12,6 +12,8 @@ struct ContentView: View {
     @State private var units = UnitSettings()
     @State private var mapPacks = MapPackStore()
     @State private var nutrition = NutritionStore()
+    @State private var goalSettings = GoalSettings()
+    @State private var profile = ProfileSettings()
     @State private var onboarding = OnboardingState()
     @State private var cloudBackup = CloudBackupService()
     @State private var autoBackup = AutoBackupSettings()
@@ -79,6 +81,8 @@ struct ContentView: View {
         .environment(nutrition)
         .environment(cloudBackup)
         .environment(autoBackup)
+        .environment(goalSettings)
+        .environment(profile)
         .environment(\.unitSystem, units.system)
         .preferredColorScheme(appearance.colorScheme)
         .fullScreenCover(isPresented: .constant(!onboarding.isComplete)) {
@@ -87,6 +91,8 @@ struct ContentView: View {
                 .environment(units)
                 .environment(watchLayout)
                 .environment(nutrition)
+                .environment(goalSettings)
+                .environment(profile)
                 .environment(\.unitSystem, units.system)
         }
         .fullScreenCover(isPresented: $showsWorkout) {
@@ -110,6 +116,10 @@ struct ContentView: View {
             )
 
             watchLink.activate()
+
+            // A goal is part of the dashboard, so the wrist hears about it the
+            // moment it changes rather than at the next launch.
+            goalSettings.onChange = { pushDashboard() }
 
             // The watch reads its units out of the layout document, so the two
             // devices are brought into line at launch rather than drifting until
@@ -252,6 +262,8 @@ struct ContentView: View {
                         WatchSetupView()
                     case .backup:
                         BackupView()
+                    case .goals:
+                        DailyGoalsView()
                     }
                 }
         }
@@ -265,7 +277,9 @@ struct ContentView: View {
             dashboard: dashboardSettings,
             appearance: appearance,
             units: units,
-            mapPacks: mapPacks
+            mapPacks: mapPacks,
+            goals: goalSettings,
+            profile: profile
         )
     }
 
@@ -288,7 +302,12 @@ struct ContentView: View {
     /// Mirrors the Today dashboard — layout, readings, recovery and history — to the watch.
     private func pushDashboard() {
         watchLink.sendDashboard(
-            WatchSyncPayloads.dashboard(settings: dashboardSettings, health: health, store: store)
+            WatchSyncPayloads.dashboard(
+                settings: dashboardSettings,
+                health: health,
+                store: store,
+                goals: goalSettings
+            )
         )
     }
 

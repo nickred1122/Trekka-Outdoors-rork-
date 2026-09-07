@@ -176,7 +176,8 @@ struct TodayWatchView: View {
         NavigationLink(value: TodayWatchRoute.metric(metric.rawValue)) {
             WatchMetricTile(
                 metric: metric,
-                reading: dashboard.reading(for: metric)
+                reading: dashboard.reading(for: metric),
+                goal: dashboard.goal(for: metric)
             )
         }
         .buttonStyle(.plain)
@@ -252,6 +253,10 @@ struct MetricDetailWatchView: View {
         dashboard.reading(for: metric)
     }
 
+    private var goal: MetricGoalTransfer? {
+        dashboard.goal(for: metric)
+    }
+
     private var samples: [Double] {
         (reading?.series ?? []).filter { $0 > 0 }
     }
@@ -275,6 +280,28 @@ struct MetricDetailWatchView: View {
 
                 Text(metric.periodLabel)
                     .fieldLabelStyle(metric.tint)
+
+                if let goal {
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(spacing: 4) {
+                            Text("Daily goal")
+                                .fieldLabelStyle()
+                            Spacer(minLength: 0)
+                            if goal.streak > 1 {
+                                Label("\(goal.streak)", systemImage: "flame.fill")
+                                    .font(.watch(9, weight: .bold))
+                                    .foregroundStyle(WatchTheme.highlight)
+                            }
+                        }
+                        WatchGoalBar(goal: goal, tint: metric.tint)
+                        Text("\(goal.daysMetThisWeek) of the last 7 days")
+                            .font(.watch(9))
+                            .foregroundStyle(WatchTheme.textSecondary)
+                    }
+                    .padding(9)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .watchPanel()
+                }
 
                 if samples.count > 1 {
                     WatchSparkline(values: reading?.series ?? [], tint: metric.tint)

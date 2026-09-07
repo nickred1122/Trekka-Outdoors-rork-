@@ -35,7 +35,8 @@ nonisolated enum InsightEngine {
         activities: [ActivityRecord],
         snapshot: HealthSnapshot,
         day: DayNutrition,
-        goals: NutritionGoals,
+        fuelGoals: NutritionGoals,
+        dailyGoals: DailyGoals = .empty,
         now: Date = .now
     ) -> [TrainingInsight] {
         let recent = activities.filter { now.timeIntervalSince($0.startDate) <= window && $0.startDate <= now }
@@ -46,11 +47,25 @@ nonisolated enum InsightEngine {
 
         var insights: [TrainingInsight] = []
 
+        // Goals first when there are any: a target the athlete set for
+        // themselves today outranks an observation about last week.
+        insights.append(
+            contentsOf: goalInsights(
+                goals: dailyGoals,
+                snapshot: snapshot,
+                activities: activities,
+                now: now
+            )
+        )
+
         if let volume = volumeInsight(recent: recent, previous: previous) {
             insights.append(volume)
         }
         if let consistency = consistencyInsight(recent: recent, now: now) {
             insights.append(consistency)
+        }
+        if let hrv = hrvInsight(snapshot: snapshot) {
+            insights.append(hrv)
         }
         if let resting = restingInsight(snapshot: snapshot) {
             insights.append(resting)
@@ -58,14 +73,90 @@ nonisolated enum InsightEngine {
         if let sleep = sleepInsight(snapshot: snapshot) {
             insights.append(sleep)
         }
+        if let load = loadInsight(snapshot: snapshot) {
+            insights.append(load)
+        }
         if let climbing = climbingInsight(recent: recent) {
             insights.append(climbing)
         }
         if let longest = longestInsight(recent: recent) {
             insights.append(longest)
         }
-        if let fuel = fuelInsight(day: day, goals: goals, snapshot: snapshot) {
+        if let fuel = fuelInsight(day: day, goals: fuelGoals, snapshot: snapshot) {
             insights.append(fuel)
+        }
+
+        return insights
+    }
+
+    // MARK: - Goals
+
+    /// What the athlete's own targets say about today.
+    ///
+    /// At most two lines: how today is going overall, and the run of days behind
+    /// the strongest goal. A card that lists seven goals one after another stops
+    /// being read.
+    private static func goalInsights(
+        goals: DailyGoals,
+        snapshot: HealthSnapshot,
+        activities: [ActivityRecord],
+        now: Date
+    ) -> [TrainingInsight] {
+        let progress = DailyGoalEngine.progress(
+            goals: goals,
+            snapshot: snapshot,
+            activities: activities,
+            now: now
+        )
+        guard !progress.isEmpty else { return [] }
+
+        var insights: [TrainingInsight] = []
+        let met = progress.filter(\.isMet)
+        // Name the one closest to done rather than the one furthest behind: it
+        // is the only one the remaining hours of today can realistically fix.
+        let closest = progress.filter { !$0.isMet }.max { $0.fraction < $1.fraction }
+
+        if met.count == progress.count, let first = progress.first {
+            insights.append(
+                TrainingInsight(
+                    id: "goals",
+                    title: "Daily goals",
+                    detail: progress.count == 1
+                        ? "\(first.metric.title) goal met — \(first.progressText)"
+                        : "All \(progress.count) goals met today",
+                    symbol: "checkmark.seal.fill",
+                    tone: .positive
+                )
+            )
+        } else {
+            var detail = "\(met.count) of \(progress.count) met so far today"
+            if let closest {
+                detail = progress.count == 1
+                    ? "\(closest.metric.title): \(closest.progressText), \(closest.remainingText.lowercased())"
+                    : detail + ". Closest is \(closest.metric.title.lowercased()), \(closest.remainingText.lowercased())"
+            }
+            insights.append(
+                TrainingInsight(
+                    id: "goals",
+                    title: "Daily goals",
+                    detail: detail,
+                    symbol: "target",
+                    tone: met.isEmpty ? .neutral : .positive
+                )
+            )
+        }
+
+        // A streak is only worth mentioning once it is a run rather than a day.
+        if let best = progress.max(by: { $0.streak < $1.streak }), best.streak >= 3 {
+            insights.append(
+                TrainingInsight(
+                    id: "streak",
+                    title: "Streak",
+                    detail: "\(best.streak) days in a row at your \(best.metric.title.lowercased()) goal of \(best.targetText)",
+                    symbol: "flame.fill",
+                    tone: .positive
+                )
+            )
         }
 
         return insights
@@ -214,19 +305,82 @@ nonisolated enum InsightEngine {
         let recorded = snapshot.sleepTrend.suffix(7).filter { $0 > 0 }
         guard recorded.count >= 3 else { return nil }
 
-        let average = recorded.reduce(0, +) / Double(recorded.count)
-        let hours = Int(average) / 3600
-        let minutes = (Int(average) % 3600) / 60
+        // The nightly series is in hours, not seconds. Reading it as seconds
+        // averaged every athlete alive to "0h 0m" and then told them they were
+        // under target, which is worse than saying nothing at all.
+        let averageHours = recorded.reduce(0, +) / Double(recorded.count)
+        let hours = Int(averageHours)
+        let minutes = Int((averageHours - Double(hours)) * 60)
         let text = "\(hours)h \(minutes)m a night across \(recorded.count) recorded nights"
 
         return TrainingInsight(
             id: "sleep",
             title: "Sleep",
-            detail: average < 7 * 3600
+            detail: averageHours < 7
                 ? "\(text) — under the 7 hours most training plans assume"
                 : text,
             symbol: "moon.zzz.fill",
-            tone: average < 7 * 3600 ? .caution : .positive
+            tone: averageHours < 7 ? .caution : .positive
+        )
+    }
+
+    /// Overnight HRV against the athlete's own baseline, never a population one.
+    private static func hrvInsight(snapshot: HealthSnapshot) -> TrainingInsight? {
+        let value = snapshot.hrv
+        let baseline = snapshot.hrvBaseline
+        guard value > 0, baseline > 0 else { return nil }
+
+        let delta = (value - baseline) / baseline * 100
+        // Under 8% either way is ordinary night-to-night noise — the same
+        // threshold the tile uses, so the two can never disagree about a number
+        // the athlete can see in both places.
+        guard abs(delta) >= 8 else {
+            return TrainingInsight(
+                id: "hrv",
+                title: "HRV",
+                detail: "\(Int(value.rounded())) ms, on your \(Int(baseline.rounded())) ms baseline",
+                symbol: "waveform.path.ecg",
+                tone: .positive
+            )
+        }
+        return TrainingInsight(
+            id: "hrv",
+            title: "HRV",
+            detail: delta > 0
+                ? "\(Int(value.rounded())) ms, \(Int(delta.rounded()))% above your \(Int(baseline.rounded())) ms baseline — you are absorbing the work"
+                : "\(Int(value.rounded())) ms, \(Int(abs(delta).rounded()))% below your \(Int(baseline.rounded())) ms baseline — favour volume over intensity",
+            symbol: "waveform.path.ecg",
+            tone: delta > 0 ? .positive : .caution
+        )
+    }
+
+    /// Where the rolling seven-day load sits against the band that builds
+    /// fitness without outrunning recovery.
+    private static func loadInsight(snapshot: HealthSnapshot) -> TrainingInsight? {
+        let load = snapshot.trainingLoad
+        guard load > 0 else { return nil }
+        let detail: String
+        let tone: InsightTone
+        switch load {
+        case 1..<300:
+            detail = "\(load) over 7 days — below your optimal band, so there is room for a quality session"
+            tone = .neutral
+        case 300..<600:
+            detail = "\(load) over 7 days — inside the optimal band"
+            tone = .positive
+        case 600..<800:
+            detail = "\(load) over 7 days — high but productive. Protect the next easy day."
+            tone = .neutral
+        default:
+            detail = "\(load) over 7 days — well above the optimal band. Take recovery before the next hard effort."
+            tone = .caution
+        }
+        return TrainingInsight(
+            id: "load",
+            title: "Training load",
+            detail: detail,
+            symbol: "chart.bar.fill",
+            tone: tone
         )
     }
 

@@ -9,7 +9,9 @@ struct MetricDetailView: View {
     @Environment(HealthService.self) private var health
     @Environment(RouteStore.self) private var store
     @Environment(DashboardSettings.self) private var settings
+    @Environment(GoalSettings.self) private var goalSettings
 
+    @State private var showsGoalSheet = false
     @State private var selectedIndex: Int?
     /// The day the whole screen is scoped to. Ranges longer than a day end here.
     @State private var selectedDate: Date = Calendar.current.startOfDay(for: Date())
@@ -46,6 +48,25 @@ struct MetricDetailView: View {
         return combined
             .filter { $0.startDate <= referenceDate }
             .sorted { $0.startDate > $1.startDate }
+    }
+
+    /// Today against this metric's daily target, if one is set. Always measured
+    /// against today even when the chart is scrubbed back, because a goal is a
+    /// property of today rather than of whatever window is being read.
+    private var goal: GoalProgress? {
+        DailyGoalEngine.progress(
+            for: metric,
+            goals: goalSettings.snapshot,
+            snapshot: health.snapshot,
+            activities: store.recentActivities + health.healthActivities
+        )
+    }
+
+    /// The goal line is only drawn where a bar means one day. On an hourly or
+    /// weekly chart a daily target is not the same quantity as the bars.
+    private var goalLineTarget: Double? {
+        guard window.bucketNoun == "day", let target = goalSettings.target(for: metric) else { return nil }
+        return target
     }
 
     private var reading: MetricReading? {
@@ -111,6 +132,9 @@ struct MetricDetailView: View {
                 if window.span == nil {
                     dayStepper
                 }
+                if metric.supportsDailyGoal {
+                    goalCard
+                }
                 rangePicker
                 chartCard(samples)
                 // Sleep is the one metric whose shape matters more than its
@@ -161,6 +185,91 @@ struct MetricDetailView: View {
         }
         .sheet(isPresented: $showsCalendar) {
             calendarSheet
+        }
+        .sheet(isPresented: $showsGoalSheet) {
+            NavigationStack {
+                DailyGoalsView(focused: metric)
+            }
+        }
+    }
+
+    // MARK: - Goal
+
+    @ViewBuilder
+    private var goalCard: some View {
+        if let goal {
+            Button {
+                showsGoalSheet = true
+            } label: {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Text("Today's goal")
+                            .metricLabelStyle()
+                        Spacer(minLength: 0)
+                        if goal.streak > 0 {
+                            Label("\(goal.streak) day\(goal.streak == 1 ? "" : "s")", systemImage: "flame.fill")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Theme.highlight)
+                        }
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Theme.textPrimary.opacity(0.35))
+                    }
+
+                    GoalBar(progress: goal, tint: metric.tint, showsCaption: false)
+
+                    HStack(spacing: 8) {
+                        Text(goal.progressText)
+                            .font(.system(.subheadline, weight: .bold))
+                            .foregroundStyle(goal.isMet ? Theme.positive : Theme.textPrimary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                        Spacer(minLength: 0)
+                        Text(goal.remainingText)
+                            .font(.caption)
+                            .foregroundStyle(Theme.textPrimary.opacity(0.55))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+
+                    Text("Met on \(goal.daysMetThisWeek) of the last 7 days.")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.textPrimary.opacity(0.42))
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .panel()
+            }
+            .buttonStyle(TilePressStyle())
+        } else {
+            Button {
+                showsGoalSheet = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "target")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(metric.tint)
+                        .frame(width: 32, height: 32)
+                        .background(metric.tint.opacity(0.12), in: .rect(cornerRadius: 9))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Set a daily goal")
+                            .font(.system(.subheadline, weight: .semibold))
+                            .foregroundStyle(Theme.textPrimary)
+                        Text("Track \(metric.title.lowercased()) against a target on your dashboard and watch")
+                            .font(.caption)
+                            .foregroundStyle(Theme.textPrimary.opacity(0.55))
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.textPrimary.opacity(0.3))
+                }
+                .padding(12)
+                .panel()
+            }
+            .buttonStyle(TilePressStyle())
         }
     }
 
@@ -430,9 +539,23 @@ struct MetricDetailView: View {
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                     .foregroundStyle(Theme.textPrimary.opacity(0.28))
             }
+
+            if let target = goalLineTarget {
+                RuleMark(y: .value("Goal", target))
+                    .lineStyle(StrokeStyle(lineWidth: 1.4, dash: [2, 3]))
+                    .foregroundStyle(metric.tint.opacity(0.75))
+                    .annotation(position: .top, alignment: .trailing, spacing: 1) {
+                        Text("GOAL")
+                            .font(.system(size: 8, weight: .bold))
+                            .kerning(0.6)
+                            .foregroundStyle(metric.tint)
+                    }
+            }
         }
         .chartXScale(domain: -0.6...(Double(samples.count) - 0.4))
-        .chartYScale(domain: yDomain(samples.map(\.value)))
+        // The goal is part of the domain, so a target nobody has reached yet is
+        // still visible above the bars rather than clipped off the top.
+        .chartYScale(domain: yDomain(samples.map(\.value) + [goalLineTarget ?? 0]))
         .chartPlotStyle { plot in
             // Keeps every mark inside the axes even when the renderer rounds a
             // stroke width or a symbol past the edge of the domain.

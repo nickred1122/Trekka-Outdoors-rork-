@@ -59,6 +59,8 @@ struct WatchSparkline: View {
 struct WatchMetricTile: View {
     let metric: WatchDashboardMetric
     let reading: MetricReadingTransfer?
+    /// Today against the phone's daily target, when one is set.
+    var goal: MetricGoalTransfer?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -67,6 +69,11 @@ struct WatchMetricTile: View {
                 Text(metric.title)
                     .fieldLabelStyle()
                 Spacer(minLength: 0)
+                if goal?.isMet == true {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.watch(9, weight: .bold))
+                        .foregroundStyle(WatchTheme.positive)
+                }
                 if let deltaUp {
                     Image(systemName: deltaUp ? "arrow.up.right" : "arrow.down.right")
                         .font(.watch(8, weight: .bold))
@@ -88,6 +95,10 @@ struct WatchMetricTile: View {
                 Spacer(minLength: 0)
             }
 
+            if let goal {
+                WatchGoalBar(goal: goal, tint: metric.tint)
+            }
+
             if let series = reading?.series, series.contains(where: { $0 > 0 }) {
                 WatchSparkline(values: series, tint: metric.tint)
                     .frame(height: WatchDisplay.scaled(18, atLeast: 13))
@@ -106,6 +117,40 @@ struct WatchMetricTile: View {
               let last = series.last, let previous = series.dropLast().last,
               abs(last - previous) > 0.0001 else { return nil }
         return last > previous
+    }
+}
+
+/// Today against a daily target: a filled track and the two numbers, exactly as
+/// the phone shows them.
+struct WatchGoalBar: View {
+    let goal: MetricGoalTransfer
+    var tint: Color
+    var showsCaption: Bool = true
+
+    private var fill: Color { goal.isMet ? WatchTheme.positive : tint }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(WatchTheme.textSecondary.opacity(0.28))
+                    Capsule()
+                        .fill(fill)
+                        .frame(width: max(goal.fraction > 0 ? 3 : 0, geometry.size.width * goal.fraction))
+                }
+            }
+            .frame(height: 4)
+
+            if showsCaption {
+                Text(goal.progressText)
+                    .font(.metric(9, weight: .semibold))
+                    .foregroundStyle(WatchTheme.textSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 

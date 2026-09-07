@@ -3,8 +3,10 @@ import SwiftUI
 /// The steps of first run, in order.
 private enum OnboardingStep: Int, CaseIterable, Identifiable {
     case welcome
+    case name
     case units
     case health
+    case goals
     case fuel
     case ready
 
@@ -51,6 +53,8 @@ struct OnboardingView: View {
     @Environment(UnitSettings.self) private var units
     @Environment(WatchLayoutStore.self) private var watchLayout
     @Environment(NutritionStore.self) private var nutrition
+    @Environment(GoalSettings.self) private var goals
+    @Environment(ProfileSettings.self) private var profile
 
     var onFinish: () -> Void
 
@@ -58,6 +62,8 @@ struct OnboardingView: View {
     @State private var energyTarget: Double = NutritionGoals.default.energyKilocalories
     @State private var split: MacroSplit = .balanced
     @State private var setsFuelGoal = false
+    @State private var name = ""
+    @FocusState private var isNamingSelf: Bool
     @State private var feedback = 0
 
     var body: some View {
@@ -123,10 +129,72 @@ struct OnboardingView: View {
     private var stepContent: some View {
         switch step {
         case .welcome: welcomeStep
+        case .name: nameStep
         case .units: unitsStep
         case .health: healthStep
+        case .goals: goalsStep
         case .fuel: fuelStep
         case .ready: readyStep
+        }
+    }
+
+    /// One field, and it is optional. The name is only ever used to address the
+    /// athlete inside their own app — there is no account behind it.
+    private var nameStep: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            Image(systemName: "person.crop.circle")
+                .font(.system(size: 36, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+
+            heading("What should we call you?", detail: "Used to greet you on the dashboard and nowhere else. It stays on this phone — there is no account and nothing is sent anywhere.")
+
+            TextField("Your name", text: $name)
+                .font(.system(.title3, weight: .bold))
+                .foregroundStyle(Theme.textPrimary)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .submitLabel(.done)
+                .focused($isNamingSelf)
+                .onSubmit { advance() }
+                .padding(14)
+                .panel()
+
+            if !name.isEmpty {
+                Text(ProfileSettings.preview(greetingFor: name))
+                    .font(.system(.subheadline, weight: .semibold))
+                    .foregroundStyle(Theme.accent)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.snappy(duration: 0.25), value: name.isEmpty)
+    }
+
+    /// Goals are offered, not assumed. Each one starts at a round number the
+    /// athlete can move later; nothing here is derived from their body or their
+    /// history, because Trekka does not know enough to set a target for anyone.
+    private var goalsStep: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            Image(systemName: "target")
+                .font(.system(size: 36, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+
+            heading("Set a daily goal?", detail: "Pick any that matter to you. Each shows as a progress bar on its dashboard tile and on your watch, measured against what Apple Health and your workouts actually record.")
+
+            VStack(spacing: 10) {
+                ForEach(DashboardMetric.goalCapable) { metric in
+                    choiceCard(
+                        title: metric.title,
+                        detail: metric.goalSummary(goals.target(for: metric) ?? metric.defaultGoalTarget),
+                        symbol: metric.symbol,
+                        isSelected: goals.hasGoal(for: metric)
+                    ) {
+                        goals.toggle(metric)
+                        feedback += 1
+                    }
+                }
+            }
+
+            footnote("You can change the numbers, or turn any of these off, in Settings → Daily goals.")
         }
     }
 
@@ -313,8 +381,10 @@ struct OnboardingView: View {
     private var primaryTitle: String {
         switch step {
         case .welcome: "Get started"
+        case .name: name.isEmpty ? "Continue" : "Nice to meet you"
         case .units: "Continue"
         case .health: health.authorization == .authorized ? "Continue" : "Connect Apple Health"
+        case .goals: goals.isEmpty ? "Continue" : "Save \(goals.metricsWithGoals.count) goal\(goals.metricsWithGoals.count == 1 ? "" : "s")"
         case .fuel: setsFuelGoal ? "Save target" : "Continue"
         case .ready: "Start using Trekka"
         }
@@ -322,7 +392,9 @@ struct OnboardingView: View {
 
     private var secondaryTitle: String? {
         switch step {
+        case .name where !name.isEmpty: "Skip"
         case .health where health.authorization != .authorized: "Not now"
+        case .goals where !goals.isEmpty: "No goals for now"
         case .fuel where setsFuelGoal: "Skip for now"
         default: nil
         }
@@ -331,6 +403,10 @@ struct OnboardingView: View {
     private func advance() {
         feedback += 1
         switch step {
+        case .name:
+            profile.setName(name)
+            isNamingSelf = false
+            step = .units
         case .health where health.authorization != .authorized
             && health.authorization != .unavailable
             && health.authorization != .denied:
@@ -338,7 +414,7 @@ struct OnboardingView: View {
             // held until the answer comes back rather than moving on behind it.
             Task {
                 await health.requestAuthorization()
-                step = .fuel
+                step = .goals
             }
         case .fuel:
             if setsFuelGoal {
@@ -360,7 +436,16 @@ struct OnboardingView: View {
     private func skip() {
         feedback += 1
         switch step {
-        case .health: step = .fuel
+        case .name:
+            name = ""
+            isNamingSelf = false
+            step = .units
+        case .health: step = .goals
+        case .goals:
+            // Turning them all off is the honest reading of "no goals for now" —
+            // anything toggled while browsing should not be kept by accident.
+            goals.clearAll()
+            step = .fuel
         case .fuel:
             setsFuelGoal = false
             step = .ready

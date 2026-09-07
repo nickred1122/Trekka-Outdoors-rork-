@@ -11,6 +11,8 @@ struct TrainingInsightsCard: View {
     let snapshot: HealthSnapshot
 
     @Environment(NutritionStore.self) private var nutrition
+    @Environment(GoalSettings.self) private var goals
+    @Environment(ProfileSettings.self) private var profile
     @State private var intelligence = IntelligenceService()
 
     private var insights: [TrainingInsight] {
@@ -18,7 +20,8 @@ struct TrainingInsightsCard: View {
             activities: activities,
             snapshot: snapshot,
             day: nutrition.day(Date()),
-            goals: nutrition.goals
+            fuelGoals: nutrition.goals,
+            dailyGoals: goals.snapshot
         )
     }
 
@@ -71,7 +74,7 @@ struct TrainingInsightsCard: View {
         .animation(.snappy(duration: 0.3), value: intelligence.isWorking)
         .task {
             intelligence.refreshAvailability()
-            await intelligence.summarise(facts: insights.map(\.fact))
+            await intelligence.summarise(facts: insights.map(\.fact), name: profile.firstName)
         }
     }
 
@@ -81,16 +84,22 @@ struct TrainingInsightsCard: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.accent)
 
-            Text("Insights")
+            Text(profile.possessive("week"))
                 .font(.system(.subheadline, weight: .bold))
                 .foregroundStyle(Theme.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
 
             Spacer(minLength: 0)
 
             if intelligence.availability.isReady && !intelligence.isWorking {
                 Button {
                     Task {
-                        await intelligence.summarise(facts: insights.map(\.fact), force: true)
+                        await intelligence.summarise(
+                            facts: insights.map(\.fact),
+                            name: profile.firstName,
+                            force: true
+                        )
                     }
                 } label: {
                     Image(systemName: "arrow.clockwise")

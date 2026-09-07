@@ -14,6 +14,8 @@ struct TodayView: View {
     @Environment(DashboardSettings.self) private var settings
     @Environment(AppearanceSettings.self) private var appearance
     @Environment(WatchLayoutStore.self) private var watchLayout
+    @Environment(GoalSettings.self) private var goalSettings
+    @Environment(ProfileSettings.self) private var profile
     @Binding var pendingWorkoutRoute: PlannedRoute?
     @Binding var showsWorkout: Bool
 
@@ -55,6 +57,17 @@ struct TodayView: View {
         )
     }
 
+    /// Today against every goal that is switched on, worked out once for the
+    /// whole dashboard rather than per tile.
+    private var goalProgress: [DashboardMetric: GoalProgress] {
+        let resolved = DailyGoalEngine.progress(
+            goals: goalSettings.snapshot,
+            snapshot: snapshot,
+            activities: allActivities
+        )
+        return Dictionary(uniqueKeysWithValues: resolved.map { ($0.metric, $0) })
+    }
+
     private var zoneMinutes: [Double] {
         let fromStore = store.weeklyZoneMinutes
         if fromStore.contains(where: { $0 > 0 }) { return fromStore }
@@ -78,7 +91,7 @@ struct TodayView: View {
 
                 rangeRow
 
-                metricGrid
+                metricGrid(goals: goalProgress)
 
                 if !settings.hasExploredMetrics && !settings.visibleMetrics.isEmpty {
                     hintRow
@@ -197,12 +210,16 @@ struct TodayView: View {
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(Theme.accent)
             VStack(alignment: .leading, spacing: 1) {
-                Text(Date.now, format: .dateTime.weekday(.wide).month(.abbreviated).day())
+                Text(profile.greeting())
                     .font(.system(.headline, weight: .semibold))
                     .foregroundStyle(Theme.textPrimary)
-                Text(healthStatusLine)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text("\(Date.now.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())) · \(healthStatusLine)")
                     .font(.caption)
                     .foregroundStyle(Theme.textPrimary.opacity(0.5))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             Spacer()
             Button {
@@ -318,7 +335,7 @@ struct TodayView: View {
     }
 
     @ViewBuilder
-    private var metricGrid: some View {
+    private func metricGrid(goals: [DashboardMetric: GoalProgress]) -> some View {
         let metrics = settings.visibleMetrics
         if metrics.isEmpty {
             Button {
@@ -346,14 +363,14 @@ struct TodayView: View {
                 spacing: 12
             ) {
                 ForEach(metrics) { metric in
-                    tile(for: metric)
+                    tile(for: metric, goal: goals[metric])
                 }
             }
         }
     }
 
     @ViewBuilder
-    private func tile(for metric: DashboardMetric) -> some View {
+    private func tile(for metric: DashboardMetric, goal: GoalProgress?) -> some View {
         let window = window
         let series = samples(for: metric)
         let headline = MetricSeries.headline(metric: metric, window: window, samples: series)
@@ -368,6 +385,10 @@ struct TodayView: View {
                 trendColor: metric.tint,
                 deltaUp: MetricSeries.deltaUp(series),
                 caption: metric.headlineCaption(for: window),
+                // A goal is a day's target, so it is only shown while the tile is
+                // actually reporting today. Scrubbed back to March, the bar
+                // would be measuring today's steps against a March column.
+                goal: window.isToday ? goal : nil,
                 showsSparkline: settings.showsTileCharts
             )
         }

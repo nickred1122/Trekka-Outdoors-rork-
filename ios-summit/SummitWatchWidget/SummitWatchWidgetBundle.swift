@@ -5,5 +5,6 @@ import WidgetKit
 struct SummitWatchWidgetBundle: WidgetBundle {
     var body: some Widget {
         SummitPowerWidget()
+        SummitGoalsWidget()
     }
 }

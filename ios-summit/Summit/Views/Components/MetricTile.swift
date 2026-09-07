@@ -12,6 +12,8 @@ struct MetricTile: View {
     var trendColor: Color
     var deltaUp: Bool?
     var caption: String?
+    /// Today against this metric's daily target, when the athlete set one.
+    var goal: GoalProgress?
     var showsSparkline: Bool = true
     var showsDisclosure: Bool = true
 
@@ -25,6 +27,12 @@ struct MetricTile: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 Spacer(minLength: 0)
+                if goal?.isMet == true {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Theme.positive)
+                        .transition(.scale.combined(with: .opacity))
+                }
                 if let deltaUp {
                     Image(systemName: deltaUp ? "arrow.up.right" : "arrow.down.right")
                         .font(.system(size: 11, weight: .bold))
@@ -56,6 +64,10 @@ struct MetricTile: View {
             .lineLimit(1)
             .minimumScaleFactor(0.6)
 
+            if let goal {
+                GoalBar(progress: goal, tint: symbolColor)
+            }
+
             if showsSparkline {
                 MiniMetricChart(samples: samples, color: trendColor)
                     .frame(height: 26)
@@ -70,11 +82,64 @@ struct MetricTile: View {
         .padding(showsSparkline ? 14 : 11)
         .frame(maxWidth: .infinity, alignment: .leading)
         .panel()
+        .animation(.snappy(duration: 0.3), value: goal?.fraction)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
-        .accessibilityValue("\(value) \(unit ?? "")\(suffix ?? "")")
+        .accessibilityValue(accessibilityValue)
         .accessibilityHint("Opens the \(label) breakdown")
         .accessibilityAddTraits(.isButton)
+    }
+
+    private var accessibilityValue: String {
+        let headline = "\(value) \(unit ?? "")\(suffix ?? "")"
+        guard let goal else { return headline }
+        return "\(headline). \(goal.progressText) of today's goal, \(goal.remainingText)"
+    }
+}
+
+/// Today against a daily target: a filled track, the two numbers, and what is
+/// left of it.
+///
+/// The track is drawn even at zero so a goal that has not been started yet
+/// still reads as a goal rather than as missing data.
+struct GoalBar: View {
+    let progress: GoalProgress
+    var tint: Color
+    var showsCaption: Bool = true
+
+    private var fillColor: Color { progress.isMet ? Theme.positive : tint }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Theme.textPrimary.opacity(0.1))
+                    Capsule()
+                        .fill(fillColor)
+                        .frame(width: max(progress.fraction > 0 ? 4 : 0, geometry.size.width * progress.fraction))
+                }
+            }
+            .frame(height: 5)
+
+            if showsCaption {
+                HStack(spacing: 4) {
+                    Text(progress.progressText)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary.opacity(0.55))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                    Spacer(minLength: 0)
+                    if progress.streak > 1 {
+                        Label("\(progress.streak)", systemImage: "flame.fill")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(Theme.highlight)
+                            .labelStyle(.titleAndIcon)
+                    }
+                }
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 

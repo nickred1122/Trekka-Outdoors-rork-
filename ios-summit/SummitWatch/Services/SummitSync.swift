@@ -23,6 +23,32 @@ nonisolated struct MetricReadingTransfer: Codable, Sendable, Hashable, Identifia
     var id: String { metric }
 }
 
+/// One daily goal, resolved against today on the phone.
+///
+/// The numbers travel already formatted because the phone is the only device
+/// that knows how the athlete has asked to read them — so the wrist can never
+/// print a goal in kilometres that the phone shows in miles.
+nonisolated struct MetricGoalTransfer: Codable, Sendable, Hashable, Identifiable {
+    var metric: String
+    var target: Double
+    var value: Double
+    var targetText: String
+    var valueText: String
+    var streak: Int
+    var daysMetThisWeek: Int
+
+    var id: String { metric }
+
+    var fraction: Double {
+        guard target > 0 else { return 0 }
+        return min(1, max(0, value / target))
+    }
+
+    var isMet: Bool { target > 0 && value >= target }
+
+    var progressText: String { "\(valueText) of \(targetText)" }
+}
+
 /// Which tiles the dashboard shows and in what order.
 nonisolated struct DashboardPreferencesTransfer: Codable, Sendable, Equatable {
     var order: [String]
@@ -80,5 +106,8 @@ nonisolated struct DashboardTransfer: Codable, Sendable {
     var zoneMinutes: [Double]
     var hasHealthData: Bool
     var activities: [ActivityTransfer]
+    /// Optional so a dashboard stored on the watch before goals existed still
+    /// decodes rather than being thrown away as unreadable.
+    var goals: [MetricGoalTransfer]?
     var sentAt: Date
 }

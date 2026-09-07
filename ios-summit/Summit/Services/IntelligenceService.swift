@@ -39,6 +39,9 @@ final class IntelligenceService {
     /// The facts the current summary was written from, so it is not regenerated
     /// on every redraw.
     private var lastFacts: [String] = []
+    /// The name the current summary was addressed to, so setting one is enough
+    /// to have the next summary use it.
+    private var lastName: String = ""
 
     // MARK: - Availability
 
@@ -74,14 +77,19 @@ final class IntelligenceService {
 
     /// Writes a summary of the supplied facts, if the device can.
     ///
-    /// - Parameter force: regenerate even when these facts were already summarised.
-    func summarise(facts: [String], force: Bool = false) async {
+    /// - Parameters:
+    ///   - name: what to call the athlete, or empty to address them without one.
+    ///     A name is safe to hand a language model in a way a number is not:
+    ///     getting it wrong is obvious, and it cannot become a false claim about
+    ///     what someone did.
+    ///   - force: regenerate even when these facts were already summarised.
+    func summarise(facts: [String], name: String = "", force: Bool = false) async {
         guard !facts.isEmpty else {
             summary = nil
             return
         }
         guard availability.isReady, !isWorking else { return }
-        guard force || facts != lastFacts || summary == nil else { return }
+        guard force || facts != lastFacts || name != lastName || summary == nil else { return }
 
         #if canImport(FoundationModels)
         guard #available(iOS 26.0, *) else { return }
@@ -98,6 +106,9 @@ final class IntelligenceService {
             "DO NOT give medical, dietary or injury advice."
             "DO NOT use bullet points, headings, emoji or exclamation marks."
             "Write plainly, in the second person, as a level-headed coach would."
+            if !name.isEmpty {
+                "The person is called \(name). You may address them by name once, at most."
+            }
         }
 
         do {
@@ -119,11 +130,13 @@ final class IntelligenceService {
                 summary = nil
                 wasDiscarded = true
                 lastFacts = facts
+                lastName = name
                 return
             }
 
             summary = text
             lastFacts = facts
+            lastName = name
         } catch {
             // A failed summary is not worth interrupting anyone for — the
             // computed figures below it are the substance of the card.
@@ -135,6 +148,7 @@ final class IntelligenceService {
     func clear() {
         summary = nil
         lastFacts = []
+        lastName = ""
         wasDiscarded = false
     }
 
