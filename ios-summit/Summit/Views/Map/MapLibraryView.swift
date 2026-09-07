@@ -14,6 +14,7 @@ struct MapLibraryView: View {
     @Environment(RouteStore.self) private var store
     @Environment(MapPackStore.self) private var mapPacks
 
+    @State private var link = WatchLink.shared
     @State private var showsAreaDownload = false
     @State private var showsClearConfirmation = false
     @State private var feedback = 0
@@ -45,6 +46,8 @@ struct MapLibraryView: View {
                 }
 
                 areaDownloadButton
+
+                watchButton
 
                 routesSection
 
@@ -246,6 +249,54 @@ struct MapLibraryView: View {
         .disabled(mapPacks.progress.isBusy)
     }
 
+    /// A way through to the watch's real contents.
+    ///
+    /// Kept as its own door rather than a section inlined here, because what is
+    /// on the watch is reported by the watch and can differ from what this
+    /// phone holds — conflating the two lists is what made the old screen
+    /// quietly misleading.
+    private var watchButton: some View {
+        NavigationLink {
+            WatchMapsView()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "applewatch")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Theme.canvas)
+                    .frame(width: 34, height: 34)
+                    .background(Theme.highlight, in: .rect(cornerRadius: 10))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("On your watch")
+                        .font(.system(.subheadline, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text(watchDetail)
+                        .font(.caption)
+                        .foregroundStyle(Theme.textPrimary.opacity(0.55))
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.textPrimary.opacity(0.3))
+            }
+            .padding(12)
+            .panel()
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var watchDetail: String {
+        guard link.isPaired else { return "No Apple Watch paired" }
+        guard link.isWatchAppInstalled else { return "Trekka isn't installed on your watch yet" }
+        guard let inventory = link.watchInventory else {
+            return "Open Trekka on your wrist to see what it is carrying"
+        }
+        if inventory.packs.isEmpty {
+            return "No maps stored on the watch · \(inventory.routes.count) route\(inventory.routes.count == 1 ? "" : "s")"
+        }
+        return "\(inventory.packs.count) map\(inventory.packs.count == 1 ? "" : "s") · \(inventory.packBytesDescription) · \(inventory.freeBytesDescription) free"
+    }
+
     private var clearAllButton: some View {
         Button(role: .destructive) {
             showsClearConfirmation = true
@@ -348,6 +399,22 @@ struct MapLibraryView: View {
                     .monospacedDigit()
                     .foregroundStyle(Theme.positive)
 
+                // The phone has this map but the watch does not, so offer to
+                // send it. Without this the only way to retry a failed
+                // transfer was to delete the map and fetch every tile again.
+                if isMissingFromWatch(pack) {
+                    Button {
+                        mapPacks.sendToWatch(packID: pack.id)
+                        feedback += 1
+                    } label: {
+                        Image(systemName: "applewatch.radiowaves.left.and.right")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Theme.accent)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Send the offline map for \(route.name) to the watch")
+                }
+
                 Button {
                     mapPacks.delete(packID: pack.id)
                     feedback += 1
@@ -376,6 +443,15 @@ struct MapLibraryView: View {
             }
         }
         .padding(12)
+    }
+
+    /// Whether the watch has said it is holding this map. Only ever answered
+    /// from the watch's own report; an unanswered watch is left alone rather
+    /// than assumed empty.
+    private func isMissingFromWatch(_ pack: MapPackSummary) -> Bool {
+        guard link.isPaired, link.isWatchAppInstalled else { return false }
+        guard let inventory = link.watchInventory else { return false }
+        return !inventory.hasPack(id: pack.id)
     }
 
     // MARK: - Packs

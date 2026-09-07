@@ -20,6 +20,9 @@ final class PreflightLocation: NSObject, CLLocationManagerDelegate {
     private(set) var isDenied = false
     /// Whether the receiver is currently listening.
     private(set) var isRunning = false
+    /// Where the athlete is, once the receiver can say. Nil until then, so a
+    /// caller can never mistake an unknown position for one on the equator.
+    private(set) var coordinate: CLLocationCoordinate2D?
 
     private let manager = CLLocationManager()
 
@@ -91,6 +94,7 @@ final class PreflightLocation: NSObject, CLLocationManagerDelegate {
             .map(\.horizontalAccuracy)
             .filter { $0 > 0 }
             .min()
+        let newest = locations.last?.coordinate
         guard let best else { return }
         Task { @MainActor [weak self] in
             guard let self else { return }
@@ -98,6 +102,7 @@ final class PreflightLocation: NSObject, CLLocationManagerDelegate {
             // that has degraded since should say so, not keep showing the good
             // number it managed a minute ago.
             self.accuracy = best
+            if let newest { self.coordinate = newest }
         }
     }
 

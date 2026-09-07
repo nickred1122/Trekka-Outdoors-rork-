@@ -6,6 +6,14 @@ nonisolated enum MapPackKind: String, Codable, Sendable {
     case route
     /// A square of ground kept ready around a place the athlete starts from.
     case home
+    /// A square of ground the athlete picked out on the map themselves.
+    ///
+    /// This case was missing here while the phone had it, which meant an area
+    /// pack arriving from the phone could not decode its own manifest: the
+    /// reader threw, and the pack was deleted as damaged the moment it landed.
+    /// Both copies of this file are the wire format, so both must know every
+    /// kind.
+    case area
 }
 
 /// The index at the front of a pack file.

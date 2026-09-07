@@ -181,6 +181,7 @@ struct ContentView: View {
 struct WatchSettingsView: View {
     @Environment(WatchScreenSettings.self) private var settings
     @Environment(WatchDashboardStore.self) private var dashboard
+    @Environment(WatchMapPackStore.self) private var mapPacks
 
     var body: some View {
         List {
@@ -390,6 +391,26 @@ struct WatchSettingsView: View {
                 Text(settings.unitSystem == .metric
                      ? "Kilometres, metres, km/h"
                      : "Miles, feet, mph")
+                    .font(.system(size: 9))
+            }
+
+            Section {
+                NavigationLink {
+                    OfflineMapsWatchView()
+                } label: {
+                    HStack {
+                        Label("Offline maps", systemImage: "map.fill")
+                            .font(.system(size: 12))
+                        Spacer()
+                        Text(mapPacks.hasPacks ? mapPacks.totalSizeDescription : "None")
+                            .font(.metric(10, weight: .semibold))
+                            .foregroundStyle(mapPacks.hasPacks ? WatchTheme.positive : WatchTheme.textSecondary)
+                    }
+                }
+            } header: {
+                Text("Maps")
+            } footer: {
+                Text("Download map ground straight to your watch, with or without your iPhone nearby.")
                     .font(.system(size: 9))
             }
 

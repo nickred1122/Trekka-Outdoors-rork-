@@ -53,6 +53,11 @@ final class MapPackStore {
     private var readers: [UUID: MapPackReader] = [:]
     private var task: Task<Void, Never>?
 
+    /// Why the last attempt to send a map to the watch could not start, if it
+    /// could not. Kept apart from `progress` because a phone download that
+    /// succeeded is not a failure just because the watch was out of range.
+    private(set) var lastSendBlock: WatchSendBlock?
+
     /// Reads pack tiles for the renderer. Held separately so the actor can keep
     /// a weak reference without owning the store.
     private let bridge = MapPackBridge()
@@ -146,6 +151,51 @@ final class MapPackStore {
 
     func pack(forRoute routeID: UUID) -> MapPackSummary? {
         packs.first { $0.routeID == routeID }
+    }
+
+    func pack(id: UUID) -> MapPackSummary? {
+        packs.first { $0.id == id }
+    }
+
+    /// Sends a map already on the phone to the watch.
+    ///
+    /// The reason this exists: a transfer can fail for reasons that have
+    /// nothing to do with the download — the watch out of range, its app not
+    /// yet installed, storage full at the far end. Without a way to try again,
+    /// the only route back was to delete the map and fetch every tile a second
+    /// time, which is absurd when the bytes are already sitting on the phone.
+    @discardableResult
+    func sendToWatch(packID: UUID) -> WatchSendBlock? {
+        guard let summary = pack(id: packID),
+              let url = try? fileURL(for: packID),
+              FileManager.default.fileExists(atPath: url.path) else {
+            lastSendBlock = nil
+            return nil
+        }
+
+        let block = WatchLink.shared.sendMapPack(
+            fileURL: url,
+            packID: packID,
+            name: summary.name,
+            sizeBytes: summary.fileBytes
+        )
+        lastSendBlock = block
+        return block
+    }
+
+    /// Sends every map on the phone that the watch is not already holding.
+    @discardableResult
+    func sendMissingToWatch() -> WatchSendBlock? {
+        let onWatch = WatchLink.shared.watchInventory
+        var firstBlock: WatchSendBlock?
+        for pack in packs where pack.kind != .home {
+            if onWatch?.hasPack(id: pack.id) == true { continue }
+            if let block = sendToWatch(packID: pack.id), firstBlock == nil {
+                firstBlock = block
+            }
+        }
+        lastSendBlock = firstBlock
+        return firstBlock
     }
 
     func hasPack(forRoute routeID: UUID) -> Bool {
@@ -332,20 +382,24 @@ final class MapPackStore {
             if sendToWatch {
                 progress = .sendingToWatch
                 let summary = reader.summary
-                let sent = WatchLink.shared.sendMapPack(
+                let block = WatchLink.shared.sendMapPack(
                     fileURL: url,
-                    regionID: id.uuidString,
+                    packID: id,
                     name: name,
                     sizeBytes: summary.fileBytes
                 )
-                if !sent {
+                lastSendBlock = block
+                if let block {
                     // The phone still has the map, so this is not a failure of
-                    // the download — say exactly that.
-                    progress = .failed("Map saved on your phone. Pair your watch to send it there too.")
+                    // the download — say exactly that, and name the real reason.
+                    progress = .failed("Map saved on your phone. \(block.message)")
                     return
                 }
             }
 
+            // Ready means the phone has it. Whether the watch has it is a
+            // separate question, answered by the watch itself rather than
+            // assumed here — a queued transfer is not a delivered one.
             progress = .ready
         } catch {
             progress = .failed(error.localizedDescription)

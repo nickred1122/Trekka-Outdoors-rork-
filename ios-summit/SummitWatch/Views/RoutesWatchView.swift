@@ -243,6 +243,8 @@ struct RouteDetailWatchView: View {
     var onStart: (WatchRoute) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(WatchMapPackStore.self) private var packs
+    @Environment(WatchMapDownloader.self) private var downloader
 
     var body: some View {
         ScrollView {
@@ -302,10 +304,75 @@ struct RouteDetailWatchView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(WatchTheme.accent)
+
+                offlineMapPanel
             }
             .padding(.horizontal, 4)
         }
         .navigationTitle(route.name)
+    }
+
+    /// Whether the ground under this route is on the wrist, and a way to fetch
+    /// it here rather than having to go back to the phone for it.
+    @ViewBuilder
+    private var offlineMapPanel: some View {
+        let stored = packs.pack(forRoute: route.id)
+        let isActive = downloader.activeRouteID == route.id && downloader.isBusy
+
+        VStack(alignment: .leading, spacing: 5) {
+            Text("Offline map")
+                .fieldLabelStyle()
+
+            if isActive {
+                Text(downloadLabel)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(WatchTheme.textPrimary)
+                ProgressView(value: downloader.phase.fraction)
+                    .tint(WatchTheme.accent)
+                Button("Stop") { downloader.cancel() }
+                    .font(.system(size: 10, weight: .semibold))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(WatchTheme.danger)
+            } else if let stored {
+                HStack(spacing: 4) {
+                    TrekkaIcon(.route, size: 11, tint: WatchTheme.positive)
+                    Text("Stored · \(stored.sizeDescription)")
+                        .font(.metric(10, weight: .semibold))
+                        .foregroundStyle(WatchTheme.positive)
+                }
+                Text("The ground draws with no phone and no signal.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(WatchTheme.textSecondary)
+            } else {
+                Text("Not stored. The route line still navigates offline; the map under it needs a signal.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(WatchTheme.textSecondary)
+                Button {
+                    downloader.download(route: route)
+                } label: {
+                    TrekkaLabel("Download map", glyph: .compass, size: 12)
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .buttonStyle(.bordered)
+                .disabled(downloader.isBusy)
+            }
+
+            if case .failed(let message) = downloader.phase, downloader.activeRouteID == nil {
+                Text(message)
+                    .font(.system(size: 9))
+                    .foregroundStyle(WatchTheme.danger)
+            }
+        }
+        .padding(9)
+        .watchPanel()
+    }
+
+    private var downloadLabel: String {
+        switch downloader.phase {
+        case .downloading(let completed, let total): "Tile \(completed) of \(total)"
+        case .writing: "Saving…"
+        default: "Working…"
+        }
     }
 }
 

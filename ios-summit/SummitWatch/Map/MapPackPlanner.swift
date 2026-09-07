@@ -13,7 +13,7 @@ import CoreLocation
 /// tile grid, keep the tiles it crosses, and pad by a ring of neighbours so
 /// there is ground either side of the line rather than a bare edge.
 ///
-/// This file is duplicated in the watch target. The two copies must stay
+/// This file is duplicated in the phone target. The two copies must stay
 /// identical: a pack planned by one and read by the other has to agree about
 /// which tiles a route needs.
 nonisolated enum MapPackPlanner {

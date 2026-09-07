@@ -21,6 +21,14 @@ struct AreaDownloadView: View {
     @State private var suggestedName: String = ""
     @State private var locateToken = 0
     @State private var namingTask: Task<Void, Never>?
+    /// Whether this square should also go to the wrist.
+    ///
+    /// It could not before: an area kept by hand stayed on the phone, with no
+    /// way to say otherwise, which made "download an area" useless to anyone
+    /// whose reason for downloading it was the watch.
+    @State private var sendsToWatch = true
+
+    @State private var link = WatchLink.shared
 
     /// Drawing the square, rather than panning the ground under it.
     @State private var isDrawing = false
@@ -236,6 +244,8 @@ struct AreaDownloadView: View {
                 warning("This area is too large to keep at full detail, so the closest zoom levels are left out. The ground still draws, just less finely. A smaller area keeps everything.")
             }
 
+            watchToggle
+
             downloadControl
         }
         .padding(16)
@@ -265,6 +275,23 @@ struct AreaDownloadView: View {
         }
         let estimate: Int = plan.tileCount * average
         return "\(plan.tileCount) tiles \u{00b7} roughly \(MapPackFormat.describe(bytes: estimate)) (estimated)"
+    }
+
+    @ViewBuilder
+    private var watchToggle: some View {
+        if link.isPaired, link.isWatchAppInstalled {
+            Toggle(isOn: $sendsToWatch) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Send to Apple Watch")
+                        .font(.system(.subheadline, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text("Keeps this ground on your wrist as well as your phone")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textPrimary.opacity(0.55))
+                }
+            }
+            .tint(Theme.accent)
+        }
     }
 
     private func warning(_ text: String) -> some View {
@@ -354,7 +381,8 @@ struct AreaDownloadView: View {
         mapPacks.downloadArea(
             centre: centre,
             radiusMetres: radiusMetres,
-            name: resolved
+            name: resolved,
+            sendToWatch: sendsToWatch && link.isPaired && link.isWatchAppInstalled
         )
     }
 }

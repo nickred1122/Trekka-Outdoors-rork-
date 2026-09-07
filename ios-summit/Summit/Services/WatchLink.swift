@@ -34,6 +34,47 @@ nonisolated struct WatchScreenInfo: Codable, Sendable {
     var screenHeight: Double
 }
 
+/// Why a map cannot be sent to the watch at this moment.
+///
+/// Worth naming rather than returning a bare `false`: "no watch paired" and
+/// "the watch app is not installed" need different things from the athlete, and
+/// telling them the wrong one wastes their time.
+nonisolated enum WatchSendBlock: Equatable, Sendable {
+    case unsupported
+    case notPaired
+    case appNotInstalled
+    case notActivated
+
+    var message: String {
+        switch self {
+        case .unsupported:
+            "This iPhone cannot talk to an Apple Watch."
+        case .notPaired:
+            "No Apple Watch is paired with this iPhone."
+        case .appNotInstalled:
+            "Install Trekka on your Apple Watch, then send the map again."
+        case .notActivated:
+            "Still connecting to your Apple Watch. Try again in a moment."
+        }
+    }
+}
+
+/// Where one map's journey to the watch has got to.
+///
+/// A file transfer is not instant and can fail long after it was handed over,
+/// so the phone tracks each one rather than assuming it worked. The previous
+/// version reported success the moment the transfer was queued, which is how a
+/// map could appear downloaded on the phone and be absent from the wrist.
+nonisolated enum WatchPackTransfer: Equatable, Sendable {
+    /// Handed to the system, which will deliver it when the watch is available.
+    case sending
+    /// The system confirmed delivery.
+    case delivered
+    case failed(String)
+
+    var isSending: Bool { self == .sending }
+}
+
 /// The phone's end of the watch bridge.
 ///
 /// Layouts ride in the application context (always-latest wins), routes travel
@@ -54,6 +95,14 @@ final class WatchLink: NSObject, WCSessionDelegate {
     /// it. nil until the first sync, and remembered across launches.
     private(set) var pairedWatchWidth: Double?
 
+    /// What the watch says it is carrying. Reported by the watch, never
+    /// inferred here, and remembered across launches so the phone can show it
+    /// before the watch has had a chance to check in again.
+    private(set) var watchInventory: WatchInventory?
+
+    /// Delivery state per map, keyed by pack id.
+    private(set) var packTransfers: [UUID: WatchPackTransfer] = [:]
+
     /// What the actual wrist can hold. The ceiling until the watch reports its
     /// size — limits only ever tighten once the width is known.
     var watchCapacity: WatchPageCapacity {
@@ -62,6 +111,7 @@ final class WatchLink: NSObject, WCSessionDelegate {
     }
 
     private let watchWidthKey = "watch.screen.width"
+    private let inventoryKey = "watch.inventory.v1"
 
     /// Set by the app root so finished watch workouts land in the activity store.
     var onWorkout: ((ActivityRecord) -> Void)?
@@ -77,6 +127,10 @@ final class WatchLink: NSObject, WCSessionDelegate {
     private override init() {
         super.init()
         pairedWatchWidth = UserDefaults.standard.object(forKey: watchWidthKey) as? Double
+        if let data = UserDefaults.standard.data(forKey: inventoryKey),
+           let stored = try? JSONDecoder().decode(WatchInventory.self, from: data) {
+            watchInventory = stored
+        }
     }
 
     func activate() {
@@ -119,16 +173,51 @@ final class WatchLink: NSObject, WCSessionDelegate {
     /// Ships an offline map pack as a background file transfer. Packs are far too
     /// large for the application context, and a file transfer survives the phone
     /// going back in a pocket mid-send.
-    @discardableResult
-    func sendMapPack(fileURL: URL, regionID: String, name: String, sizeBytes: Int) -> Bool {
-        guard let session = activeSession() else { return false }
+    ///
+    /// Returns nil once the transfer is under way, or why it could not start.
+    /// Delivery itself is reported later, through `packTransfers`.
+    func sendMapPack(fileURL: URL, packID: UUID, name: String, sizeBytes: Int) -> WatchSendBlock? {
+        guard WCSession.isSupported() else { return .unsupported }
+        let session = WCSession.default
+        refresh(session)
+
+        guard session.activationState == .activated else { return .notActivated }
+        guard session.isPaired else { return .notPaired }
+        guard session.isWatchAppInstalled else { return .appNotInstalled }
+
         session.transferFile(fileURL, metadata: [
             "kind": "mapPack",
-            "regionID": regionID,
+            "regionID": packID.uuidString,
             "name": name,
             "sizeBytes": sizeBytes,
         ])
+        packTransfers[packID] = .sending
+        return nil
+    }
+
+    /// Asks the watch to delete a stored map.
+    @discardableResult
+    func requestPackDeletion(packID: UUID) -> Bool {
+        guard let session = activeSession(),
+              let data = packID.uuidString.data(using: .utf8) else { return false }
+        session.transferUserInfo(["kind": "deletePack", "payload": data])
         return true
+    }
+
+    /// Asks the watch to report what it is carrying.
+    @discardableResult
+    func requestInventory() -> Bool {
+        guard let session = activeSession() else { return false }
+        session.transferUserInfo(["kind": "inventoryRequest", "payload": Data()])
+        return true
+    }
+
+    /// Maps still in flight, straight from the system's own queue.
+    var outstandingTransferCount: Int {
+        guard WCSession.isSupported() else { return 0 }
+        let session = WCSession.default
+        guard session.activationState == .activated else { return 0 }
+        return session.outstandingFileTransfers.count
     }
 
     @discardableResult
@@ -156,6 +245,9 @@ final class WatchLink: NSObject, WCSessionDelegate {
     nonisolated func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
         Task { @MainActor in
             self.refresh(session)
+            // The watch may have changed what it holds while the phone was
+            // away — it could have downloaded a map on its own, or trimmed one.
+            self.requestInventory()
         }
     }
 
@@ -168,6 +260,39 @@ final class WatchLink: NSObject, WCSessionDelegate {
     nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
         Task { @MainActor in
             self.refresh(session)
+        }
+    }
+
+    nonisolated func sessionWatchStateDidChange(_ session: WCSession) {
+        Task { @MainActor in
+            self.refresh(session)
+        }
+    }
+
+    /// The outcome of a map transfer, which is the only trustworthy signal that
+    /// a map actually reached the wrist.
+    ///
+    /// Values are read out before hopping actors: `WCSessionFileTransfer` is not
+    /// safe to carry across, and all that is needed from it is the pack id.
+    nonisolated func session(
+        _ session: WCSession,
+        didFinish fileTransfer: WCSessionFileTransfer,
+        error: Error?
+    ) {
+        let metadata = fileTransfer.file.metadata
+        guard metadata?["kind"] as? String == "mapPack",
+              let regionID = metadata?["regionID"] as? String,
+              let packID = UUID(uuidString: regionID) else { return }
+        let failure = error?.localizedDescription
+
+        Task { @MainActor in
+            if let failure {
+                self.packTransfers[packID] = .failed(failure)
+            } else {
+                self.packTransfers[packID] = .delivered
+                // Have the watch confirm it in its own words.
+                self.requestInventory()
+            }
         }
     }
 
@@ -198,8 +323,31 @@ final class WatchLink: NSObject, WCSessionDelegate {
                 self.pairedWatchWidth = info.screenWidth
                 UserDefaults.standard.set(info.screenWidth, forKey: self.watchWidthKey)
             }
+        case "inventory":
+            guard let inventory = try? JSONDecoder().decode(WatchInventory.self, from: data) else { return }
+            Task { @MainActor in
+                self.applyInventory(inventory, raw: data)
+            }
         default:
             break
+        }
+    }
+
+    /// Takes the watch at its word about its own contents.
+    ///
+    /// Transfer states are reconciled against it: a map the watch is holding is
+    /// delivered whatever the transfer said, and one it is not holding has no
+    /// business still claiming to be delivered.
+    private func applyInventory(_ inventory: WatchInventory, raw: Data) {
+        watchInventory = inventory
+        UserDefaults.standard.set(raw, forKey: inventoryKey)
+
+        for (packID, state) in packTransfers {
+            if inventory.hasPack(id: packID) {
+                packTransfers[packID] = .delivered
+            } else if state == .delivered {
+                packTransfers[packID] = nil
+            }
         }
     }
 
