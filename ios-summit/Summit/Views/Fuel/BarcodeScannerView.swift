@@ -287,11 +287,15 @@ final class BarcodeCameraController: UIViewController {
             }
             session.addOutput(output)
             output.setMetadataObjectsDelegate(self, queue: .main)
-            // Only the symbologies the device actually supports can be set;
-            // asking for one it does not have raises an exception.
+            session.commitConfiguration()
+
+            // Only the symbologies the device actually supports can be set, and
+            // asking for one it does not have raises an exception. The supported
+            // list is not filled in until the configuration is committed, so this
+            // has to come after the commit — reading it earlier returns nothing
+            // and would leave the scanner watching for no formats at all.
             let supported = Set(output.availableMetadataObjectTypes)
             output.metadataObjectTypes = Self.symbologies.filter { supported.contains($0) }
-            session.commitConfiguration()
 
             session.startRunning()
 

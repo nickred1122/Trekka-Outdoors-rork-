@@ -213,11 +213,12 @@ private actor HealthStore {
             HKObjectType.workoutType(),
             HKSeriesType.workoutRoute(),
         ]
-        // A logged food is a correlation grouping its nutrients, which is how
-        // the Health app itself models one meal.
-        if let food = HKCorrelationType.correlationType(forIdentifier: .food) {
-            types.insert(food)
-        }
+        // A logged food is saved as a `.food` correlation, but the correlation
+        // type itself must never appear here. HealthKit disallows asking for
+        // permission on a correlation directly and raises an Objective-C
+        // exception that no Swift `catch` can stop, killing the app at launch.
+        // Permission for a correlation is the permission for the samples inside
+        // it, which is what the dietary types in `writeQuantities` cover.
         for identifier in Self.writeQuantities {
             if let type = HKQuantityType.quantityType(forIdentifier: identifier) {
                 types.insert(type)
