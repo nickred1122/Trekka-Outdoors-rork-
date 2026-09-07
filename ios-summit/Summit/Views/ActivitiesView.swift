@@ -14,10 +14,23 @@ struct ActivitiesView: View {
     @State private var filter: RouteActivityType?
     @State private var showsLogger = false
 
+    private var allActivities: [ActivityRecord] {
+        ActivityFeed.merged(store: store, health: health)
+    }
+
     private var activities: [ActivityRecord] {
-        let sorted = ActivityFeed.merged(store: store, health: health)
-        guard let filter else { return sorted }
-        return sorted.filter { $0.activity == filter }
+        guard let filter else { return allActivities }
+        return allActivities.filter { $0.activity == filter }
+    }
+
+    /// Only the activities actually present in the history, in family order.
+    ///
+    /// The catalogue runs to dozens of types; offering a filter for a sport the
+    /// athlete has never recorded would be a row of chips that all lead to an
+    /// empty list.
+    private var availableFilters: [RouteActivityType] {
+        let present = Set(allActivities.map(\.activity))
+        return RouteActivityType.allCases.filter { present.contains($0) }
     }
 
     private var weekTotals: (distance: Double, duration: TimeInterval, gain: Double) {
@@ -128,8 +141,8 @@ struct ActivitiesView: View {
         ScrollView(.horizontal) {
             HStack(spacing: 8) {
                 chip(title: "All", isActive: filter == nil) { filter = nil }
-                ForEach(RouteActivityType.allCases, id: \.self) { type in
-                    chip(title: type.rawValue, isActive: filter == type) {
+                ForEach(availableFilters, id: \.self) { type in
+                    chip(title: type.title, isActive: filter == type) {
                         filter = filter == type ? nil : type
                     }
                 }

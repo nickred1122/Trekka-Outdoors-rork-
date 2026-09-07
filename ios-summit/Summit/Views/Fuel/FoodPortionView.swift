@@ -153,7 +153,10 @@ struct FoodPortionView: View {
     /// Steps by a size that suits the food: the packet's serving when it has
     /// one, so a 330 ml can does not have to be nudged up ten grams at a time.
     private var stepSize: Double {
-        let serving = food.selectablePortions.first { $0.grams != 100 }?.grams
+        // Only the packet's own serving sets the step. A household measure is a
+        // convention, not a property of this food, so letting one drive the
+        // stepper would nudge every unlabelled food in 50 g jumps.
+        let serving = food.packetPortions.first { $0.grams != 100 }?.grams
         guard let serving, serving >= 5 else { return 10 }
         return serving.rounded()
     }
@@ -163,18 +166,33 @@ struct FoodPortionView: View {
         return Button {
             setGrams(portion.grams)
         } label: {
-            Text(portion.name)
-                .font(.system(.caption, weight: .semibold))
-                .foregroundStyle(isActive ? Theme.canvas : Theme.textPrimary.opacity(0.8))
-                .lineLimit(1)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(
-                    isActive ? Theme.accent : Theme.textPrimary.opacity(0.07),
-                    in: .capsule
-                )
+            HStack(spacing: 4) {
+                Text(portion.name)
+                    .lineLimit(1)
+                // A household measure's weight is a convention, not a figure
+                // off a label, so it is marked rather than presented as fact.
+                if portion.isEstimate {
+                    Text("~\(Int(portion.grams)) \(food.measureUnit)")
+                        .foregroundStyle(
+                            isActive ? Theme.canvas.opacity(0.7) : Theme.textPrimary.opacity(0.45)
+                        )
+                }
+            }
+            .font(.system(.caption, weight: .semibold))
+            .foregroundStyle(isActive ? Theme.canvas : Theme.textPrimary.opacity(0.8))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(
+                isActive ? Theme.accent : Theme.textPrimary.opacity(0.07),
+                in: .capsule
+            )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(
+            portion.isEstimate
+                ? "\(portion.name), about \(Int(portion.grams)) \(food.measureUnit)"
+                : portion.name
+        )
     }
 
     private func stepButton(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {

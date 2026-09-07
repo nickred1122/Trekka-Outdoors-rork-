@@ -414,8 +414,12 @@ struct RouteBuilderView: View {
                 Divider()
 
                 Picker("Activity", selection: $activity) {
-                    ForEach(RouteActivityType.allCases, id: \.self) { value in
-                        Label(value.rawValue, systemImage: value.symbol).tag(value)
+                    ForEach(RouteActivityType.routableGrouped) { group in
+                        Section(group.family.title) {
+                            ForEach(group.activities) { value in
+                                Label(value.title, systemImage: value.symbol).tag(value)
+                            }
+                        }
                     }
                 }
 

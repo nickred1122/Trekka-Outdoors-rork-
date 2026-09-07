@@ -107,28 +107,7 @@ struct LiveWorkoutView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Activity")
                             .metricLabelStyle()
-                        HStack(spacing: 10) {
-                            ForEach(RouteActivityType.allCases, id: \.self) { type in
-                                Button {
-                                    setupActivity = type
-                                } label: {
-                                    Text(type.rawValue)
-                                        .font(.system(size: 13, weight: .semibold))
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 16)
-                                    .background(
-                                        setupActivity == type ? Theme.accent.opacity(0.16) : Theme.surface,
-                                        in: .rect(cornerRadius: 12)
-                                    )
-                                    .overlay {
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .strokeBorder(setupActivity == type ? Theme.accent : Theme.border, lineWidth: 1)
-                                    }
-                                    .foregroundStyle(setupActivity == type ? Theme.accent : Theme.textPrimary.opacity(0.75))
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
+                        ActivityPickerButton(selection: $setupActivity)
                     }
 
                     VStack(alignment: .leading, spacing: 10) {

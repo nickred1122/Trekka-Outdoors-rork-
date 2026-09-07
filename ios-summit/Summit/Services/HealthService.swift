@@ -1140,15 +1140,10 @@ private actor HealthStore {
             store.execute(query)
         }
         return samples.map { workout in
-            let type: RouteActivityType = switch workout.workoutActivityType {
-            case .cycling: .ride
-            case .hiking, .walking: .hike
-            case .traditionalStrengthTraining, .functionalStrengthTraining, .coreTraining: .strength
-            default: .run
-            }
-            // Strength workouts travel nowhere, and their distance identifier is
-            // a stand-in — reading it would report step count as distance.
-            let distance = type == .strength ? 0 : (
+            let type = RouteActivityType.from(healthKit: workout.workoutActivityType)
+            // Stationary workouts travel nowhere, and their distance identifier
+            // is a stand-in — reading it would report step count as distance.
+            let distance = type.isStationary ? 0 : (
                 workout.statistics(for: HKQuantityType(type.distanceIdentifier))?
                     .sumQuantity()?
                     .doubleValue(for: .meter()) ?? 0
@@ -1190,35 +1185,9 @@ private actor HealthStore {
         case 15..<19: "Afternoon"
         default: "Evening"
         }
-        let noun = switch type {
-        case .cycling: "Ride"
-        case .hiking: "Hike"
-        case .walking: "Walk"
-        case .running: "Run"
-        default: "Workout"
-        }
+        let resolved = RouteActivityType.from(healthKit: type)
+        let noun = resolved == .other ? "Workout" : resolved.title
         return "\(period) \(noun)"
     }
 }
 
-nonisolated extension RouteActivityType {
-    var healthKitActivity: HKWorkoutActivityType {
-        switch self {
-        case .run: .running
-        case .ride: .cycling
-        case .hike: .hiking
-        case .strength: .traditionalStrengthTraining
-        }
-    }
-
-    /// The distance type Health records this activity against. Gym sessions
-    /// travel no distance, so they fall back to steps rather than a distance
-    /// type that would never be written.
-    var distanceIdentifier: HKQuantityTypeIdentifier {
-        switch self {
-        case .ride: .distanceCycling
-        case .run, .hike: .distanceWalkingRunning
-        case .strength: .stepCount
-        }
-    }
-}

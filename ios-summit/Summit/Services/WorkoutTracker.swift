@@ -250,13 +250,19 @@ final class WorkoutTracker {
 
     private func estimatedCalories() -> Double {
         let minutes = elapsed / 60
-        let base: Double = switch activity {
+        // A rough burn per minute by family, used only until Health's own
+        // energy readings take over. Climbing is added on top, so activities
+        // that gain no height are unaffected by that term.
+        let base: Double = switch activity.family {
         case .run: 12.5
         case .ride: 9.5
         case .hike: 7.5
-        // Phone-recorded strength sessions have no route, so only the burn
-        // estimate matters here.
-        case .strength: 5.5
+        case .climb: 9.5
+        case .snow: 10.0
+        case .water: 11.5
+        case .gym: 8.0
+        case .sport: 9.0
+        case .other: 5.0
         }
         return minutes * base + elevationGain * 0.9
     }

@@ -37,4 +37,11 @@ nonisolated enum StableID {
     static func defaultPage(sport: String, index: Int) -> UUID {
         uuid(seed: "screen.\(sport).\(index)")
     }
+
+    /// Identity of a household portion offered for a food. Built on demand from
+    /// the measure list, so a fresh UUID each read would stop the picker from
+    /// recognising the portion the athlete just selected.
+    static func portion(food: UUID, measure: String) -> UUID {
+        uuid(seed: "portion.\(food.uuidString).\(measure)")
+    }
 }

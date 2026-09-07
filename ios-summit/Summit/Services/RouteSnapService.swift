@@ -50,13 +50,13 @@ nonisolated enum RouteSnapMode: String, CaseIterable, Codable, Sendable, Identif
         }
     }
 
-    /// The mode that suits an activity when the planner opens. Gym sessions
-    /// never plan routes, but the planner still needs a total answer.
+    /// The mode that suits an activity when the planner opens. Activities that
+    /// never plan routes still need an answer, so they draw straight lines.
     static func `default`(for activity: RouteActivityType) -> RouteSnapMode {
-        switch activity {
-        case .run, .hike: .foot
+        guard activity.supportsRoutes else { return .direct }
+        return switch activity.family {
         case .ride: .bike
-        case .strength: .direct
+        case .run, .hike, .climb, .snow, .water, .gym, .sport, .other: .foot
         }
     }
 }

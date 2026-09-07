@@ -163,25 +163,35 @@ final class UnitSettings {
         refreshFormatters()
     }
 
+    /// Switches the whole app between metric and imperial.
+    ///
+    /// Weight and elevation follow, because the master switch is what an
+    /// athlete reaches for when they mean "show me everything the other way".
+    /// Any override they had set is cleared rather than left behind, which is
+    /// what used to pin weight to kilograms after a switch to imperial.
     func set(_ newSystem: UnitSystem) {
         guard newSystem != system else { return }
         system = newSystem
         UserDefaults.standard.set(newSystem.rawValue, forKey: Self.storageKey)
+        clearOverrides()
         refreshFormatters()
         onChange?(newSystem)
     }
 
+    /// What weights print in. Choosing the system's own units clears the
+    /// override so weight tracks the master switch again.
     func setMass(_ newSystem: UnitSystem) {
-        guard newSystem != massOverride else { return }
-        massOverride = newSystem
-        UserDefaults.standard.set(newSystem.rawValue, forKey: Self.massKey)
+        guard newSystem != massUnits else { return }
+        massOverride = newSystem == system ? nil : newSystem
+        store(massOverride, forKey: Self.massKey)
         refreshFormatters()
     }
 
+    /// What heights and climbs print in, with the same follow-the-system rule.
     func setElevation(_ newSystem: UnitSystem) {
-        guard newSystem != elevationOverride else { return }
-        elevationOverride = newSystem
-        UserDefaults.standard.set(newSystem.rawValue, forKey: Self.elevationKey)
+        guard newSystem != elevationUnits else { return }
+        elevationOverride = newSystem == system ? nil : newSystem
+        store(elevationOverride, forKey: Self.elevationKey)
         refreshFormatters()
     }
 
@@ -190,7 +200,23 @@ final class UnitSettings {
         guard newSystem != system else { return }
         system = newSystem
         UserDefaults.standard.set(newSystem.rawValue, forKey: Self.storageKey)
+        clearOverrides()
         refreshFormatters()
+    }
+
+    private func clearOverrides() {
+        massOverride = nil
+        elevationOverride = nil
+        UserDefaults.standard.removeObject(forKey: Self.massKey)
+        UserDefaults.standard.removeObject(forKey: Self.elevationKey)
+    }
+
+    private func store(_ value: UnitSystem?, forKey key: String) {
+        if let value {
+            UserDefaults.standard.set(value.rawValue, forKey: key)
+        } else {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
     }
 
     private func refreshFormatters() {

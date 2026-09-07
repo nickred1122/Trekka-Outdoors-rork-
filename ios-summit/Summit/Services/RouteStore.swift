@@ -170,7 +170,7 @@ final class RouteStore {
         let periods = ["Morning", "Midday", "Afternoon", "Evening"]
         let generatedNames = Set(
             periods.flatMap { period in
-                RouteActivityType.allCases.map { "\(period) \($0.rawValue)" }
+                RouteActivityType.allCases.map { "\(period) \($0.title)" }
             }
         )
 

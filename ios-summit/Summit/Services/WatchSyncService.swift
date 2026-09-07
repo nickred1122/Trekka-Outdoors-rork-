@@ -53,15 +53,10 @@ nonisolated struct WatchRouteTransfer: Codable, Sendable {
         hasOfflineMap = route.isOfflineDownloaded
     }
 
+    /// The watch's name for this activity, resolved through the shared
+    /// catalogue so a new activity needs no change here.
     private static func sportRawValue(for activity: RouteActivityType) -> String {
-        switch activity {
-        case .run: return "trailRun"
-        case .ride: return "ride"
-        case .hike: return "hike"
-        // Strength sessions are not routed, but routes only ever carry the
-        // three outdoor types — this arm exists for exhaustiveness.
-        case .strength: return "strength"
-        }
+        activity.watchProfile.rawValue
     }
 }
 

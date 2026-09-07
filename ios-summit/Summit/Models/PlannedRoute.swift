@@ -49,32 +49,6 @@ nonisolated enum RouteSource: String, Codable, CaseIterable, Sendable {
     case shared = "Shared"
 }
 
-nonisolated enum RouteActivityType: String, Codable, CaseIterable, Sendable {
-    case run = "Trail Run"
-    case ride = "Ride"
-    case hike = "Hike"
-    case strength = "Strength"
-
-    var symbol: String {
-        switch self {
-        case .run: "figure.run"
-        case .ride: "bicycle"
-        case .hike: "figure.hiking"
-        case .strength: "dumbbell.fill"
-        }
-    }
-
-    /// Rough moving speed in metres per second, used for time estimates.
-    var estimatedSpeed: Double {
-        switch self {
-        case .run: 2.9
-        case .ride: 5.6
-        case .hike: 1.3
-        case .strength: 0
-        }
-    }
-}
-
 /// A planned route with its track, waypoints and offline map state.
 nonisolated struct PlannedRoute: Codable, Identifiable, Hashable, Sendable {
     var id: UUID = UUID()
@@ -103,7 +77,9 @@ nonisolated struct PlannedRoute: Codable, Identifiable, Hashable, Sendable {
     var maxElevation: Double { points.map(\.elevation).max() ?? 0 }
 
     var estimatedDuration: TimeInterval {
-        guard distance > 0 else { return 0 }
+        // A stationary activity has no travel speed, so a route drawn for one
+        // has no meaningful duration — dividing by it would yield infinity.
+        guard distance > 0, activity.estimatedSpeed > 0 else { return 0 }
         // Naismith-style correction: add time for climbing.
         return distance / activity.estimatedSpeed + elevationGain * 7.2
     }
