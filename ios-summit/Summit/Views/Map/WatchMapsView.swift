@@ -18,9 +18,9 @@ struct WatchMapsView: View {
     /// Maps on the phone that the watch is not holding. Home areas are excluded
     /// deliberately: they are the phone's own convenience cache, and the watch's
     /// storage is better spent on the route being walked.
-    private var missingFromWatch: [MapPackSummary] {
-        mapPacks.packs.filter { pack in
-            pack.kind != .home && inventory?.hasPack(id: pack.id) != true
+    private var missingFromWatch: [MapCoverage] {
+        mapPacks.coverage.filter { entry in
+            entry.kind != .home && inventory?.hasPack(id: entry.id) != true
         }
     }
 
@@ -320,7 +320,7 @@ struct WatchMapsView: View {
         }
     }
 
-    private func missingRow(_ pack: MapPackSummary) -> some View {
+    private func missingRow(_ pack: MapCoverage) -> some View {
         let state = link.packTransfers[pack.id]
 
         return HStack(spacing: 12) {
@@ -347,7 +347,7 @@ struct WatchMapsView: View {
                     .tint(Theme.accent)
             } else {
                 Button {
-                    mapPacks.sendToWatch(packID: pack.id)
+                    mapPacks.sendToWatch(coverageID: pack.id)
                     feedback += 1
                 } label: {
                     Text("Send")
@@ -365,14 +365,18 @@ struct WatchMapsView: View {
         .padding(12)
     }
 
-    private func sendDetail(for state: WatchPackTransfer?, pack: MapPackSummary) -> String {
+    private func sendDetail(for state: WatchPackTransfer?, pack: MapCoverage) -> String {
         switch state {
         case .sending:
             "Crossing to the watch. This carries on in the background."
         case .failed(let message):
             message
         case .delivered, .none:
-            pack.sizeDescription
+            // Coverage on the phone shares its ground with everything else on
+            // the map, so it has no size of its own to quote. The size the
+            // watch reports once it holds a copy is a real file, and that is
+            // shown in the list above.
+            "\(pack.tileCount) pieces of ground"
         }
     }
 

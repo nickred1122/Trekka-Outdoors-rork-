@@ -51,23 +51,23 @@ struct RouteDetailView: View {
                         Label("Export GPX", systemImage: "square.and.arrow.up")
                     }
                     if let route {
-                        if let pack = mapPacks.pack(forRoute: route.id) {
+                        if let entry = mapPacks.entry(forRoute: route.id) {
                             Button(role: .destructive) {
-                                mapPacks.delete(packID: pack.id)
+                                mapPacks.remove(coverageID: entry.id)
                                 store.setOfflineDownloaded(false, routeID: route.id)
                             } label: {
-                                Label("Remove offline map", systemImage: "trash.slash")
+                                Label("Remove from offline map", systemImage: "trash.slash")
                             }
                         } else {
                             Button {
-                                mapPacks.download(route: route)
+                                mapPacks.add(route: route)
                             } label: {
-                                Label("Download offline map", systemImage: "arrow.down.circle")
+                                Label("Add to offline map", systemImage: "arrow.down.circle")
                             }
                             Button {
-                                mapPacks.download(route: route, widened: true)
+                                mapPacks.add(route: route, widened: true)
                             } label: {
-                                Label("Download wider area", systemImage: "arrow.down.circle.dotted")
+                                Label("Add a wider area", systemImage: "arrow.down.circle.dotted")
                             }
                         }
                     }
@@ -383,14 +383,14 @@ struct RouteDetailView: View {
                     .font(.caption)
                     .foregroundStyle(Theme.textPrimary.opacity(0.6))
             }
-        } else if let pack = mapPacks.pack(forRoute: route.id) {
+        } else if let entry = mapPacks.entry(forRoute: route.id) {
             HStack(spacing: 10) {
                 TrekkaIcon(.route, size: 17, tint: Theme.positive)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Map stored for offline use")
+                    Text("Part of your offline map")
                         .font(.system(.footnote, weight: .semibold))
                         .foregroundStyle(Theme.textPrimary)
-                    Text("\(pack.sizeDescription) · \(pack.tileCount) tiles · sent to your watch")
+                    Text("\(entry.tileCount) pieces of ground · works with no signal")
                         .font(.caption)
                         .foregroundStyle(Theme.textPrimary.opacity(0.6))
                 }
@@ -401,22 +401,22 @@ struct RouteDetailView: View {
                 Label(message, systemImage: "exclamationmark.triangle.fill")
                     .font(.footnote)
                     .foregroundStyle(Theme.highlight)
-                Button("Try again") { mapPacks.download(route: route) }
+                Button("Try again") { mapPacks.add(route: route) }
                     .font(.system(.footnote, weight: .semibold))
                     .foregroundStyle(Theme.accent)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             Button {
-                mapPacks.download(route: route)
+                mapPacks.add(route: route)
             } label: {
                 HStack(spacing: 10) {
                     TrekkaIcon(.route, size: 17, tint: Theme.accent)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Download map for offline use")
+                        Text("Add to your offline map")
                             .font(.system(.footnote, weight: .semibold))
                             .foregroundStyle(Theme.textPrimary)
-                        Text("About \(estimatedPackSize(for: route)) · works with no signal on watch")
+                        Text(addDetail(for: route))
                             .font(.caption)
                             .foregroundStyle(Theme.textPrimary.opacity(0.6))
                     }
@@ -463,11 +463,20 @@ struct RouteDetailView: View {
         return ""
     }
 
-    /// An estimate, and labelled as one. The real size is shown once the pack is
-    /// on disk, because that is the only figure that is actually true.
-    private func estimatedPackSize(for route: PlannedRoute) -> String {
-        let plan = MapPackPlanner.plan(for: route.coordinates, widened: false)
-        return MapPackFormat.describe(bytes: plan.estimatedBytes)
+    /// What adding this route would genuinely cost.
+    ///
+    /// Trekka keeps one map rather than a download per route, so a route over
+    /// ground already covered adds little or nothing. Quoting the whole route's
+    /// size here would overstate it, sometimes wildly.
+    private func addDetail(for route: PlannedRoute) -> String {
+        let new = mapPacks.newTileCount(forRoute: route.coordinates)
+        guard new > 0 else {
+            return "Already covered by your map · adds nothing"
+        }
+        guard let average = mapPacks.averageBytesPerTile else {
+            return "\(new) new pieces of ground · works with no signal"
+        }
+        return "\(new) new pieces · roughly \(MapPackFormat.describe(bytes: new * average)) added"
     }
 
     private func progressRow(title: String, progress: Double, detail: String) -> some View {
@@ -495,8 +504,8 @@ struct RouteDetailView: View {
                 // a route without its map would put an athlete on a mountain
                 // with a line and no terrain, which is the exact situation this
                 // whole feature exists to prevent.
-                if !mapPacks.hasPack(forRoute: route.id), !mapPacks.progress.isBusy {
-                    mapPacks.download(route: route)
+                if !mapPacks.covers(routeID: route.id), !mapPacks.progress.isBusy {
+                    mapPacks.add(route: route)
                 }
                 syncFeedback += 1
             } label: {

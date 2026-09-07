@@ -1,12 +1,12 @@
 import SwiftUI
 import CoreLocation
 
-/// Picks a square of ground to keep offline.
+/// Picks a square of ground to add to the offline map.
 ///
 /// Until now the only ground that could be stored was a corridor along a saved
 /// route, or the starting areas Trekka cached on its own. This is the athlete
-/// choosing for themselves: pan to a place, size the square, see exactly how
-/// many tiles that is, and keep it.
+/// choosing for themselves: pan to a place, size the square, see exactly what
+/// it would add to the map, and keep it.
 struct AreaDownloadView: View {
     @Environment(MapPackStore.self) private var mapPacks
     @Environment(UnitSettings.self) private var units
@@ -267,14 +267,26 @@ struct AreaDownloadView: View {
         }
     }
 
-    /// Exact tile count, and a size only when there is real data to base it on.
+    /// What this square would actually add.
+    ///
+    /// The total stopped being the interesting number once Trekka kept one
+    /// shared map: what matters is how much of this square is ground the map
+    /// does not already hold. Over a place already covered, that can be none of
+    /// it, and quoting the full figure would talk someone out of a free square.
     private var coverageDetail: String {
-        guard let plan else { return "Pan the map to choose where" }
-        guard let average = mapPacks.averageBytesPerTile else {
-            return "\(plan.tileCount) tiles \u{00b7} size known once downloaded"
+        guard let plan, let centre = cameraCentre else { return "Pan the map to choose where" }
+        let new = mapPacks.newTileCount(forArea: centre, radiusMetres: radiusMetres)
+
+        guard new > 0 else {
+            return "\(plan.tileCount) pieces \u{00b7} all of it is already on your map"
         }
-        let estimate: Int = plan.tileCount * average
-        return "\(plan.tileCount) tiles \u{00b7} roughly \(MapPackFormat.describe(bytes: estimate)) (estimated)"
+        let shared = plan.tileCount - new
+        let sharedPart = shared > 0 ? " \u{00b7} \(shared) already covered" : ""
+
+        guard let average = mapPacks.averageBytesPerTile else {
+            return "\(new) new pieces\(sharedPart) \u{00b7} size known once downloaded"
+        }
+        return "\(new) new pieces\(sharedPart) \u{00b7} roughly \(MapPackFormat.describe(bytes: new * average)) added"
     }
 
     @ViewBuilder
@@ -311,11 +323,11 @@ struct AreaDownloadView: View {
     @ViewBuilder
     private var downloadControl: some View {
         switch mapPacks.progress {
-        case .idle, .ready, .failed:
+        case .idle, .ready, .alreadyCovered, .failed:
             Button {
                 startDownload()
             } label: {
-                Text("Keep this area offline")
+                Text("Add this area to my map")
                     .font(.system(.subheadline, weight: .bold))
                     .foregroundStyle(Theme.canvas)
                     .frame(maxWidth: .infinity)
@@ -344,9 +356,9 @@ struct AreaDownloadView: View {
 
     private var progressLabel: String {
         switch mapPacks.progress {
-        case .planning: "Working out which ground to keep\u{2026}"
-        case .downloading(let completed, let total): "Downloading \(completed) of \(total) tiles"
-        case .writing: "Saving to your phone\u{2026}"
+        case .planning: "Working out what is missing\u{2026}"
+        case .downloading(let completed, let total): "Downloading \(completed) of \(total) new pieces"
+        case .writing: "Adding it to your map\u{2026}"
         case .sendingToWatch: "Sending to your watch\u{2026}"
         default: "Working\u{2026}"
         }
@@ -378,7 +390,7 @@ struct AreaDownloadView: View {
         let resolved = trimmed.isEmpty
             ? (suggestedName.isEmpty ? "Saved area" : suggestedName)
             : trimmed
-        mapPacks.downloadArea(
+        mapPacks.addArea(
             centre: centre,
             radiusMetres: radiusMetres,
             name: resolved,

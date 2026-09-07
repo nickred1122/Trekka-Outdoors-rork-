@@ -1,15 +1,13 @@
 import SwiftUI
 
-/// One place for everything Trekka keeps on the ground.
+/// Trekka's one offline map, and everywhere it covers.
 ///
-/// This was split in two before: routes lived on the Routes tab, and the list
-/// of downloaded packs sat in Settings. Deciding whether to clear space meant
-/// visiting two screens that each knew half the answer. Everything is here now
-/// — which routes have their map, which squares were kept by hand, what the
-/// watch is carrying, and exactly what all of it occupies.
-///
-/// Every size is read from the file on disk. An athlete freeing space the night
-/// before a trip is badly served by an estimate.
+/// This screen used to list a separate download per route, which is how the
+/// storage worked underneath. It no longer does: there is a single map, and the
+/// routes and areas here are the places it has been asked to cover. That is why
+/// sizes are shown once, at the top, and not against each row — after ground is
+/// shared between overlapping routes, no honest number can be attributed to any
+/// one of them.
 struct MapLibraryView: View {
     @Environment(RouteStore.self) private var store
     @Environment(MapPackStore.self) private var mapPacks
@@ -23,17 +21,12 @@ struct MapLibraryView: View {
         store.routes.sorted { $0.createdAt > $1.createdAt }
     }
 
-    /// Route corridors whose route has since been deleted. Rare, but they still
-    /// occupy space, so they are shown rather than quietly held.
-    private var orphanedRoutePacks: [MapPackSummary] {
-        mapPacks.routePacks.filter { pack in
-            guard let routeID = pack.routeID else { return true }
-            return store.route(id: routeID) == nil
-        }
+    private var uncoveredRoutes: [PlannedRoute] {
+        routes.filter { !mapPacks.covers(routeID: $0.id) && !$0.points.isEmpty }
     }
 
-    private var storedRouteCount: Int {
-        routes.filter { mapPacks.hasPack(forRoute: $0.id) }.count
+    private var coveredRouteCount: Int {
+        routes.filter { mapPacks.covers(routeID: $0.id) }.count
     }
 
     var body: some View {
@@ -43,39 +36,31 @@ struct MapLibraryView: View {
 
                 if mapPacks.progress.isBusy {
                     progressCard
+                } else if case .failed(let message) = mapPacks.progress {
+                    failureCard(message)
+                }
+
+                if !uncoveredRoutes.isEmpty {
+                    coverEverythingButton
                 }
 
                 areaDownloadButton
 
                 watchButton
 
-                routesSection
-
-                if !mapPacks.areaPacks.isEmpty {
-                    packSection(
-                        title: "Areas you kept",
-                        caption: "Squares of ground you chose on the map.",
-                        packs: mapPacks.areaPacks
-                    )
+                if !mapPacks.chosenCoverage.isEmpty {
+                    coveredSection
                 }
 
-                if !mapPacks.homePacks.isEmpty {
-                    packSection(
-                        title: "Kept ready for you",
-                        caption: "Where you usually set off from, cached in the background so a spontaneous outing is already covered.",
-                        packs: mapPacks.homePacks
-                    )
+                if !uncoveredRoutes.isEmpty {
+                    uncoveredSection
                 }
 
-                if !orphanedRoutePacks.isEmpty {
-                    packSection(
-                        title: "Routes since deleted",
-                        caption: "The route is gone but its ground is still stored.",
-                        packs: orphanedRoutePacks
-                    )
+                if !mapPacks.homeCoverage.isEmpty {
+                    homeSection
                 }
 
-                if !mapPacks.packs.isEmpty {
+                if !mapPacks.isEmpty {
                     clearAllButton
                 }
 
@@ -87,22 +72,22 @@ struct MapLibraryView: View {
         }
         .scrollIndicators(.hidden)
         .background(Theme.canvas)
-        .navigationTitle("Offline maps")
+        .navigationTitle("Offline map")
         .navigationBarTitleDisplayMode(.inline)
         .sensoryFeedback(.success, trigger: feedback)
         .sheet(isPresented: $showsAreaDownload) {
             NavigationStack { AreaDownloadView() }
         }
         .confirmationDialog(
-            "Delete every offline map?",
+            "Delete your offline map?",
             isPresented: $showsClearConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Delete all maps", role: .destructive) {
-                mapPacks.deleteAll()
+            Button("Delete the map", role: .destructive) {
+                mapPacks.removeAll()
                 feedback += 1
             }
-            Button("Keep them", role: .cancel) {}
+            Button("Keep it", role: .cancel) {}
         } message: {
             Text("Your routes stay. Only the downloaded ground goes, and you will need a signal to see the map again.")
         }
@@ -113,21 +98,24 @@ struct MapLibraryView: View {
     private var summaryCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(mapPacks.packs.isEmpty ? "Nothing stored" : mapPacks.totalSizeDescription)
+                Text(mapPacks.isEmpty ? "Nothing stored" : mapPacks.totalSizeDescription)
                     .font(.metric(30))
                     .foregroundStyle(Theme.textPrimary)
                 Spacer(minLength: 0)
-                Text("\(mapPacks.packs.count) map\(mapPacks.packs.count == 1 ? "" : "s")")
-                    .font(.system(.caption, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.textPrimary.opacity(0.5))
+                if !mapPacks.isEmpty {
+                    Text("one map")
+                        .font(.system(.caption, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary.opacity(0.5))
+                }
             }
 
-            if !mapPacks.packs.isEmpty {
-                storageBar
-                legend
+            if mapPacks.isEmpty {
+                Text("One map covers everywhere you go. Add a route or a square of ground and it joins the same map, so places your routes share are only ever stored once.")
+                    .font(.caption)
+                    .foregroundStyle(Theme.textPrimary.opacity(0.55))
+                    .fixedSize(horizontal: false, vertical: true)
             } else {
-                Text("Send a route to your watch and its map comes down with it, so the ground is there when the signal is not. You can also keep any square of ground you like.")
+                Text(summaryDetail)
                     .font(.caption)
                     .foregroundStyle(Theme.textPrimary.opacity(0.55))
                     .fixedSize(horizontal: false, vertical: true)
@@ -137,62 +125,13 @@ struct MapLibraryView: View {
         .panel()
     }
 
-    /// Real bytes, split by what the ground was kept for.
-    private var storageBar: some View {
-        GeometryReader { proxy in
-            let total = max(1, mapPacks.totalBytes)
-            let width = proxy.size.width
-
-            HStack(spacing: 2) {
-                ForEach(barSegments, id: \.kind) { segment in
-                    Capsule()
-                        .fill(colour(for: segment.kind))
-                        .frame(width: max(2, width * Double(segment.bytes) / Double(total)) - 2)
-                }
-                Spacer(minLength: 0)
-            }
-        }
-        .frame(height: 8)
-    }
-
-    private var barSegments: [(kind: MapPackKind, bytes: Int)] {
-        [MapPackKind.route, .area, .home].compactMap { kind in
-            let bytes = mapPacks.packs.filter { $0.kind == kind }.reduce(0) { $0 + $1.fileBytes }
-            return bytes > 0 ? (kind, bytes) : nil
-        }
-    }
-
-    private var legend: some View {
-        HStack(spacing: 14) {
-            ForEach(barSegments, id: \.kind) { segment in
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(colour(for: segment.kind))
-                        .frame(width: 7, height: 7)
-                    Text("\(label(for: segment.kind)) \(MapPackFormat.describe(bytes: segment.bytes))")
-                        .font(.system(size: 11, weight: .medium))
-                        .monospacedDigit()
-                        .foregroundStyle(Theme.textPrimary.opacity(0.6))
-                }
-            }
-            Spacer(minLength: 0)
-        }
-    }
-
-    private func colour(for kind: MapPackKind) -> Color {
-        switch kind {
-        case .route: Theme.accent
-        case .area: Theme.highlight
-        case .home: Theme.zoneColors[1]
-        }
-    }
-
-    private func label(for kind: MapPackKind) -> String {
-        switch kind {
-        case .route: "Routes"
-        case .area: "Areas"
-        case .home: "Ready"
-        }
+    private var summaryDetail: String {
+        let places = mapPacks.coverage.count
+        let placePart = "\(places) place\(places == 1 ? "" : "s") covered"
+        let routePart = routes.isEmpty
+            ? ""
+            : " · \(coveredRouteCount) of \(routes.count) route\(routes.count == 1 ? "" : "s")"
+        return "\(placePart)\(routePart) · \(mapPacks.tileCount) pieces of ground, each stored once"
     }
 
     private var progressCard: some View {
@@ -202,6 +141,15 @@ struct MapLibraryView: View {
                 .foregroundStyle(Theme.textPrimary)
             ProgressView(value: mapPacks.progress.fraction)
                 .tint(Theme.accent)
+            if let index = mapPacks.batchIndex, let total = mapPacks.batchTotal {
+                Text("Route \(index) of \(total)")
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.textPrimary.opacity(0.55))
+            }
+            Button("Stop") { mapPacks.cancel() }
+                .font(.caption)
+                .foregroundStyle(Theme.textPrimary.opacity(0.6))
         }
         .padding(14)
         .panel()
@@ -209,15 +157,75 @@ struct MapLibraryView: View {
 
     private var progressLabel: String {
         switch mapPacks.progress {
-        case .planning: "Working out which ground to keep…"
-        case .downloading(let completed, let total): "Downloading \(completed) of \(total) tiles"
-        case .writing: "Saving to your phone…"
+        case .planning: "Working out what is missing…"
+        case .downloading(let completed, let total): "Downloading \(completed) of \(total) new pieces"
+        case .writing: "Adding it to your map…"
         case .sendingToWatch: "Sending to your watch…"
         default: "Working…"
         }
     }
 
+    private func failureCard(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.highlight)
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(Theme.textPrimary.opacity(0.75))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Button("Dismiss") { mapPacks.clearStatus() }
+                .font(.system(.caption, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+        }
+        .padding(14)
+        .panel()
+    }
+
     // MARK: - Actions
+
+    /// The one button that does what most people actually want: cover
+    /// everywhere they go, in one go.
+    private var coverEverythingButton: some View {
+        Button {
+            mapPacks.addAll(routes: routes)
+            feedback += 1
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "square.stack.3d.down.right.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Theme.canvas)
+                    .frame(width: 34, height: 34)
+                    .background(Theme.accent, in: .rect(cornerRadius: 10))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(mapPacks.isEmpty ? "Cover all my routes" : "Add my other routes")
+                        .font(.system(.subheadline, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text(coverEverythingDetail)
+                        .font(.caption)
+                        .foregroundStyle(Theme.textPrimary.opacity(0.55))
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.textPrimary.opacity(0.3))
+            }
+            .padding(12)
+            .panel()
+        }
+        .buttonStyle(.plain)
+        .disabled(mapPacks.progress.isBusy)
+    }
+
+    private var coverEverythingDetail: String {
+        let count = uncoveredRoutes.count
+        let noun = "\(count) route\(count == 1 ? "" : "s") not covered yet"
+        guard !mapPacks.isEmpty else { return noun }
+        return "\(noun) · ground they share with your map is already here"
+    }
 
     private var areaDownloadButton: some View {
         Button {
@@ -226,11 +234,11 @@ struct MapLibraryView: View {
             HStack(spacing: 12) {
                 Image(systemName: "square.dashed.inset.filled")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Theme.canvas)
+                    .foregroundStyle(Theme.accent)
                     .frame(width: 34, height: 34)
-                    .background(Theme.accent, in: .rect(cornerRadius: 10))
+                    .background(Theme.surfaceRaised, in: .rect(cornerRadius: 10))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Download an area")
+                    Text("Add an area")
                         .font(.system(.subheadline, weight: .semibold))
                         .foregroundStyle(Theme.textPrimary)
                     Text("Draw a square of ground and keep it")
@@ -304,7 +312,7 @@ struct MapLibraryView: View {
             HStack(spacing: 10) {
                 Image(systemName: "trash")
                     .font(.system(size: 14, weight: .semibold))
-                Text("Delete all offline maps")
+                Text("Delete the whole map")
                     .font(.system(.subheadline, weight: .semibold))
                 Spacer(minLength: 0)
             }
@@ -316,7 +324,7 @@ struct MapLibraryView: View {
     }
 
     private var footnote: some View {
-        Text("Maps have to be downloaded while you still have a connection. Sizes shown are the real files on your phone, not estimates.")
+        Text("Places that overlap share their ground, so the map grows by less than the sum of its parts. Ground has to be downloaded while you still have a connection, and the size shown is the real file on your phone.")
             .font(.caption2)
             .foregroundStyle(Theme.textPrimary.opacity(0.4))
             .fixedSize(horizontal: false, vertical: true)
@@ -324,42 +332,121 @@ struct MapLibraryView: View {
             .padding(.horizontal, 4)
     }
 
-    // MARK: - Routes
+    // MARK: - Covered
 
-    private var routesSection: some View {
+    private var coveredSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Your routes")
+                Text("Your map covers")
                     .font(.system(.subheadline, weight: .semibold))
                     .foregroundStyle(Theme.textPrimary)
                 Spacer()
-                Text(routes.isEmpty ? "None yet" : "\(storedRouteCount) of \(routes.count) stored")
+                Text("\(mapPacks.chosenCoverage.count)")
                     .font(.system(.caption, weight: .semibold))
                     .monospacedDigit()
                     .foregroundStyle(Theme.textPrimary.opacity(0.5))
             }
 
-            if routes.isEmpty {
-                Text("Build or import a route and you can keep its ground offline from here.")
-                    .font(.caption)
-                    .foregroundStyle(Theme.textPrimary.opacity(0.55))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
-                    .panel()
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(routes.enumerated()), id: \.element.id) { index, route in
-                        if index > 0 { divider }
-                        routeRow(route)
-                    }
+            VStack(spacing: 0) {
+                ForEach(Array(mapPacks.chosenCoverage.enumerated()), id: \.element.id) { index, entry in
+                    if index > 0 { divider }
+                    coverageRow(entry)
                 }
-                .panel()
             }
+            .panel()
         }
     }
 
-    private func routeRow(_ route: PlannedRoute) -> some View {
-        let pack = mapPacks.pack(forRoute: route.id)
+    private func coverageRow(_ entry: MapCoverage) -> some View {
+        let route = entry.routeID.flatMap { store.route(id: $0) }
+
+        return HStack(spacing: 12) {
+            if let route {
+                RouteThumbnail(points: route.points, showsContours: false)
+                    .frame(width: 44, height: 44)
+                    .clipShape(.rect(cornerRadius: 9))
+            } else {
+                TrekkaIcon(icon(for: entry.kind), size: 15, tint: colour(for: entry.kind))
+                    .frame(width: 44, height: 44)
+                    .background(Theme.surfaceRaised, in: .rect(cornerRadius: 9))
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.name)
+                    .font(.system(.subheadline, weight: .medium))
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(label(for: entry.kind))
+                    Text("· \(entry.tileCount) pieces")
+                        .monospacedDigit()
+                    if isOnWatch(entry) {
+                        Image(systemName: "applewatch")
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(Theme.textPrimary.opacity(0.55))
+            }
+
+            Spacer(minLength: 0)
+
+            // The phone has this ground but the watch does not, so offer to
+            // send it. Nothing is re-downloaded: the copy is cut out of the
+            // map already on the phone.
+            if isMissingFromWatch(entry) {
+                Button {
+                    mapPacks.sendToWatch(coverageID: entry.id)
+                    feedback += 1
+                } label: {
+                    Image(systemName: "applewatch.radiowaves.left.and.right")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Send \(entry.name) to the watch")
+            }
+
+            Button {
+                mapPacks.remove(coverageID: entry.id)
+                feedback += 1
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 17))
+                    .foregroundStyle(Theme.textPrimary.opacity(0.35))
+            }
+            .buttonStyle(.plain)
+            .disabled(mapPacks.progress.isBusy)
+            .accessibilityLabel("Stop covering \(entry.name)")
+        }
+        .padding(12)
+    }
+
+    // MARK: - Not covered
+
+    private var uncoveredSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Not covered yet")
+                    .font(.system(.subheadline, weight: .semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                Spacer()
+                Text("\(uncoveredRoutes.count)")
+                    .font(.system(.caption, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.textPrimary.opacity(0.5))
+            }
+
+            VStack(spacing: 0) {
+                ForEach(Array(uncoveredRoutes.enumerated()), id: \.element.id) { index, route in
+                    if index > 0 { divider }
+                    uncoveredRow(route)
+                }
+            }
+            .panel()
+        }
+    }
+
+    private func uncoveredRow(_ route: PlannedRoute) -> some View {
         let isDownloading = mapPacks.activeRouteID == route.id && mapPacks.progress.isBusy
 
         return HStack(spacing: 12) {
@@ -372,19 +459,10 @@ struct MapLibraryView: View {
                     .font(.system(.subheadline, weight: .medium))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
-                HStack(spacing: 6) {
-                    Text("\(Formatters.distance(route.distance)) \(Formatters.units.distanceUnit)")
-                        .monospacedDigit()
-                    if let pack {
-                        Text("· \(pack.tileCount) tiles")
-                            .monospacedDigit()
-                    }
-                    if route.isSyncedToWatch {
-                        Image(systemName: "applewatch")
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(Theme.textPrimary.opacity(0.55))
+                Text(addDetail(for: route))
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.textPrimary.opacity(0.55))
             }
 
             Spacer(minLength: 0)
@@ -393,91 +471,62 @@ struct MapLibraryView: View {
                 ProgressView()
                     .controlSize(.small)
                     .tint(Theme.accent)
-            } else if let pack {
-                Text(pack.sizeDescription)
-                    .font(.system(.caption, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.positive)
-
-                // The phone has this map but the watch does not, so offer to
-                // send it. Without this the only way to retry a failed
-                // transfer was to delete the map and fetch every tile again.
-                if isMissingFromWatch(pack) {
-                    Button {
-                        mapPacks.sendToWatch(packID: pack.id)
-                        feedback += 1
-                    } label: {
-                        Image(systemName: "applewatch.radiowaves.left.and.right")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Theme.accent)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Send the offline map for \(route.name) to the watch")
-                }
-
-                Button {
-                    mapPacks.delete(packID: pack.id)
-                    feedback += 1
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 17))
-                        .foregroundStyle(Theme.textPrimary.opacity(0.35))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Delete the offline map for \(route.name)")
             } else {
                 Button {
-                    mapPacks.download(route: route)
+                    mapPacks.add(route: route)
                     feedback += 1
                 } label: {
-                    Text("Download")
+                    Text("Add")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(Theme.accent)
-                        .padding(.horizontal, 11)
+                        .padding(.horizontal, 13)
                         .padding(.vertical, 7)
                         .background(Theme.accent.opacity(0.14), in: .capsule)
                 }
                 .buttonStyle(.plain)
                 .disabled(mapPacks.progress.isBusy)
-                .accessibilityLabel("Download the offline map for \(route.name)")
+                .accessibilityLabel("Add \(route.name) to your offline map")
             }
         }
         .padding(12)
     }
 
-    /// Whether the watch has said it is holding this map. Only ever answered
-    /// from the watch's own report; an unanswered watch is left alone rather
-    /// than assumed empty.
-    private func isMissingFromWatch(_ pack: MapPackSummary) -> Bool {
-        guard link.isPaired, link.isWatchAppInstalled else { return false }
-        guard let inventory = link.watchInventory else { return false }
-        return !inventory.hasPack(id: pack.id)
+    /// What adding this route would actually cost, which is the point of the
+    /// shared map: for a route over ground already kept, it can be nothing.
+    private func addDetail(for route: PlannedRoute) -> String {
+        let distance = "\(Formatters.distance(route.distance)) \(Formatters.units.distanceUnit)"
+        guard !mapPacks.isEmpty else { return distance }
+        let new = mapPacks.newTileCount(forRoute: route.coordinates)
+        if new == 0 {
+            return "\(distance) · already covered, adds nothing"
+        }
+        return "\(distance) · adds \(new) new pieces"
     }
 
-    // MARK: - Packs
+    // MARK: - Kept ready
 
-    private func packSection(title: String, caption: String, packs: [MapPackSummary]) -> some View {
+    private var homeSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Text(title)
+                Text("Kept ready for you")
                     .font(.system(.subheadline, weight: .semibold))
                     .foregroundStyle(Theme.textPrimary)
                 Spacer()
-                Text(MapPackFormat.describe(bytes: packs.reduce(0) { $0 + $1.fileBytes }))
+                Text("\(mapPacks.homeCoverage.count)")
                     .font(.system(.caption, weight: .semibold))
                     .monospacedDigit()
                     .foregroundStyle(Theme.textPrimary.opacity(0.5))
             }
 
             VStack(spacing: 0) {
-                ForEach(Array(packs.enumerated()), id: \.element.id) { index, pack in
+                ForEach(Array(mapPacks.homeCoverage.enumerated()), id: \.element.id) { index, entry in
                     if index > 0 { divider }
-                    packRow(pack)
+                    coverageRow(entry)
                 }
             }
             .panel()
 
-            Text(caption)
+            Text("Where you usually set off from, added in the background so a spontaneous outing is already covered.")
                 .font(.caption2)
                 .foregroundStyle(Theme.textPrimary.opacity(0.45))
                 .fixedSize(horizontal: false, vertical: true)
@@ -485,42 +534,40 @@ struct MapLibraryView: View {
         }
     }
 
-    private func packRow(_ pack: MapPackSummary) -> some View {
-        HStack(spacing: 12) {
-            TrekkaIcon(pack.kind == .route ? .route : .compass, size: 15, tint: colour(for: pack.kind))
-                .frame(width: 34, height: 34)
-                .background(Theme.surfaceRaised, in: .rect(cornerRadius: 9))
+    // MARK: - Helpers
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(pack.name)
-                    .font(.system(.subheadline, weight: .medium))
-                    .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(1)
-                Text("\(pack.tileCount) tiles")
-                    .font(.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.textPrimary.opacity(0.55))
-            }
+    /// Whether the watch has said it is holding this ground. Only ever answered
+    /// from the watch's own report; an unanswered watch is left alone rather
+    /// than assumed empty.
+    private func isOnWatch(_ entry: MapCoverage) -> Bool {
+        guard let inventory = link.watchInventory else { return false }
+        return inventory.hasPack(id: entry.id)
+    }
 
-            Spacer(minLength: 0)
+    private func isMissingFromWatch(_ entry: MapCoverage) -> Bool {
+        guard link.isPaired, link.isWatchAppInstalled else { return false }
+        guard link.watchInventory != nil else { return false }
+        return !isOnWatch(entry)
+    }
 
-            Text(pack.sizeDescription)
-                .font(.system(.caption, weight: .semibold))
-                .monospacedDigit()
-                .foregroundStyle(Theme.textPrimary.opacity(0.7))
-
-            Button {
-                mapPacks.delete(packID: pack.id)
-                feedback += 1
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 17))
-                    .foregroundStyle(Theme.textPrimary.opacity(0.35))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Delete \(pack.name)")
+    private func colour(for kind: MapCoverageKind) -> Color {
+        switch kind {
+        case .route: Theme.accent
+        case .area: Theme.highlight
+        case .home: Theme.zoneColors[1]
         }
-        .padding(12)
+    }
+
+    private func icon(for kind: MapCoverageKind) -> TrekkaGlyph {
+        kind == .route ? .route : .compass
+    }
+
+    private func label(for kind: MapCoverageKind) -> String {
+        switch kind {
+        case .route: "Route"
+        case .area: "Area"
+        case .home: "Starting area"
+        }
     }
 
     private var divider: some View {

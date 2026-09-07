@@ -115,15 +115,15 @@ struct SettingsView: View {
                     divider
                     infoRow(symbol: "waveform.path.ecg", title: "Recorded activities", value: "\(store.activities.count)")
                     divider
-                    // Offline maps are managed on the Routes tab, beside the
-                    // routes they cover. The figure is here because this is
+                    // The offline map is managed on the Routes tab, beside the
+                    // routes it covers. The figure is here because this is
                     // where anyone freeing up space will look first.
                     infoRow(
                         symbol: "internaldrive",
-                        title: "Offline maps",
-                        value: mapPacks.packs.isEmpty ? "None" : mapPacks.totalSizeDescription
+                        title: "Offline map",
+                        value: mapPacks.isEmpty ? "None" : mapPacks.totalSizeDescription
                     )
-                    Text("Downloaded ground is managed on the Routes tab, under Offline maps.")
+                    Text("One map covers everywhere you go. It is managed on the Routes tab, under Offline map.")
                         .font(.caption)
                         .foregroundStyle(Theme.textPrimary.opacity(0.45))
                         .fixedSize(horizontal: false, vertical: true)

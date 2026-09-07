@@ -331,9 +331,9 @@ struct RoutesView: View {
         }
     }
 
-    /// The one way into map management. Offline maps used to be listed in
-    /// Settings, a tab away from the routes they belong to; they live here now,
-    /// beside the library they cover.
+    /// The one way into map management. The offline map used to be listed in
+    /// Settings, a tab away from the routes it belongs to; it lives here now,
+    /// beside the library it covers.
     private var offlineMapsRow: some View {
         Button {
             path.append(RouteDestination.maps)
@@ -347,7 +347,7 @@ struct RoutesView: View {
                     .background(Theme.surfaceRaised, in: .rect(cornerRadius: 9))
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Offline maps")
+                    Text("Offline map")
                         .font(.system(.subheadline, weight: .semibold))
                         .foregroundStyle(Theme.textPrimary)
                     Text(offlineMapsDetail)
@@ -375,10 +375,10 @@ struct RoutesView: View {
     }
 
     private var offlineMapsDetail: String {
-        guard !mapPacks.packs.isEmpty else {
-            return "Keep ground on your phone and watch for no signal"
+        guard !mapPacks.isEmpty else {
+            return "One map covering everywhere you go, for no signal"
         }
-        let stored = store.routes.filter { mapPacks.hasPack(forRoute: $0.id) }.count
+        let stored = store.routes.filter { mapPacks.covers(routeID: $0.id) }.count
         let routePart = stored > 0 ? "\(stored) route\(stored == 1 ? "" : "s") covered · " : ""
         return "\(routePart)\(mapPacks.totalSizeDescription) stored"
     }
@@ -600,9 +600,9 @@ struct RouteRow: View {
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(Theme.zoneColors[1])
                     }
-                    // Read from the packs on disk rather than a stored flag, so
+                    // Read from the map on disk rather than a stored flag, so
                     // the mark cannot claim ground the athlete does not have.
-                    if mapPacks.hasPack(forRoute: route.id) {
+                    if mapPacks.covers(routeID: route.id) {
                         Label("Map offline", systemImage: "arrow.down.circle.fill")
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(Theme.positive)

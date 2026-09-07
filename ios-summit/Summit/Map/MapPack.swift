@@ -7,6 +7,12 @@ nonisolated enum MapPackKind: String, Codable, Sendable {
     /// A square of ground kept ready around a place the athlete starts from.
     case home
     /// A square of ground the athlete picked out on the map themselves.
+    ///
+    /// This case was missing here while the phone had it, which meant an area
+    /// pack arriving from the phone could not decode its own manifest: the
+    /// reader threw, and the pack was deleted as damaged the moment it landed.
+    /// Both copies of this file are the wire format, so both must know every
+    /// kind.
     case area
 }
 
@@ -179,6 +185,114 @@ nonisolated enum MapPackFormat {
         return (manifest, magicLength + 4 + manifestLength)
     }
 
+    /// One tile to be written, and where its bytes are coming from.
+    ///
+    /// The length is declared up front so a whole pack can be laid out — index
+    /// first, then payload — without ever holding the payload in memory. That
+    /// matters because the phone's map is one file that grows into the hundreds
+    /// of megabytes, and it is rewritten every time ground is added.
+    nonisolated struct TileWrite: Sendable {
+        var kind: String
+        var key: TopoTileKey
+        var length: Int
+        var read: @Sendable () -> Data?
+    }
+
+    /// Writes a pack by streaming each tile straight to disk.
+    ///
+    /// Same layout as `write`, but the bytes never all exist at once: tiles are
+    /// pulled one at a time, so a pack can be rebuilt from another pack on a
+    /// device with far less free memory than the file's size.
+    ///
+    /// Writes to a temporary file and swaps it into place at the end. A map
+    /// half-replaced by a crash or a kill would be worse than no map at all,
+    /// because it would render as ground the athlete was told they had.
+    static func compose(
+        manifestID: UUID,
+        name: String,
+        kind: MapPackKind,
+        routeID: UUID?,
+        centreLatitude: Double?,
+        centreLongitude: Double?,
+        createdAt: Date = Date(),
+        tiles: [TileWrite],
+        to url: URL
+    ) throws {
+        let sorted = tiles.filter { $0.length > 0 }.sorted { lhs, rhs in
+            if lhs.kind != rhs.kind { return lhs.kind == vectorKind }
+            return ordered(lhs.key, rhs.key)
+        }
+
+        var entries: [MapPackManifest.Entry] = []
+        entries.reserveCapacity(sorted.count)
+        var offset = 0
+        for tile in sorted {
+            entries.append(
+                MapPackManifest.Entry(
+                    kind: tile.kind,
+                    z: tile.key.z,
+                    x: tile.key.x,
+                    y: tile.key.y,
+                    offset: offset,
+                    length: tile.length
+                )
+            )
+            offset += tile.length
+        }
+
+        let manifest = MapPackManifest(
+            id: manifestID,
+            name: name,
+            kind: kind,
+            createdAt: createdAt,
+            routeID: routeID,
+            centreLatitude: centreLatitude,
+            centreLongitude: centreLongitude,
+            entries: entries
+        )
+
+        let manifestData = try JSONEncoder().encode(manifest)
+        var header = Data()
+        header.append(contentsOf: Array(magic.utf8))
+        var length = UInt32(manifestData.count).littleEndian
+        withUnsafeBytes(of: &length) { header.append(contentsOf: $0) }
+        header.append(manifestData)
+
+        let temporary = url.deletingLastPathComponent()
+            .appendingPathComponent("compose-\(UUID().uuidString).tmp")
+        guard FileManager.default.createFile(atPath: temporary.path, contents: nil) else {
+            throw MapPackError.malformed
+        }
+
+        do {
+            let handle = try FileHandle(forWritingTo: temporary)
+            do {
+                try handle.write(contentsOf: header)
+                for tile in sorted {
+                    // A short read would silently shift every following tile,
+                    // so the whole write is abandoned rather than patched up.
+                    guard let data = tile.read(), data.count == tile.length else {
+                        throw MapPackError.malformed
+                    }
+                    try handle.write(contentsOf: data)
+                }
+                try handle.close()
+            } catch {
+                try? handle.close()
+                throw error
+            }
+
+            if FileManager.default.fileExists(atPath: url.path) {
+                _ = try FileManager.default.replaceItemAt(url, withItemAt: temporary)
+            } else {
+                try FileManager.default.moveItem(at: temporary, to: url)
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: temporary)
+            throw error
+        }
+    }
+
     /// Human-readable size, rounded the way people talk about files.
     static func describe(bytes: Int) -> String {
         let megabytes = Double(bytes) / 1_048_576
@@ -305,6 +419,34 @@ nonisolated final class MapPackReader: @unchecked Sendable {
 
     deinit {
         try? handle.close()
+    }
+
+    /// Every tile held, without reading a single byte of payload.
+    var tileRefs: [(kind: String, key: TopoTileKey, length: Int)] {
+        lock.lock()
+        defer { lock.unlock() }
+        return index.map { entry in
+            (entry.key.kind, TopoTileKey(z: entry.key.z, x: entry.key.x, y: entry.key.y), entry.value.length)
+        }
+    }
+
+    /// Whether this pack already holds a tile. The question the one-map design
+    /// asks constantly, so it answers from the in-memory index alone.
+    func contains(kind: String, key: TopoTileKey) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return index[TileIndexKey(kind: kind, z: key.z, x: key.x, y: key.y)] != nil
+    }
+
+    /// Stored length of a tile, for laying out a pack built from this one.
+    func length(kind: String, key: TopoTileKey) -> Int? {
+        lock.lock()
+        defer { lock.unlock() }
+        return index[TileIndexKey(kind: kind, z: key.z, x: key.x, y: key.y)]?.length
+    }
+
+    func rawData(kind: String, key: TopoTileKey) -> Data? {
+        data(kind: kind, key: key)
     }
 
     func vectorTileData(_ key: TopoTileKey) -> Data? {
