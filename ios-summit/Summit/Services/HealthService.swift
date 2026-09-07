@@ -149,6 +149,30 @@ final class HealthService {
             lastWriteError = "This workout was saved in Trekka but could not be written to Apple Health."
         }
     }
+
+    /// Writes a logged food into Apple Health.
+    ///
+    /// - Returns: the identifiers of everything written, so removing the diary
+    ///   entry later can remove these too. Empty when nothing was written,
+    ///   which is the normal answer when Health access was never granted.
+    func saveFood(_ entry: FoodEntry) async -> [UUID] {
+        guard isHealthDataAvailable, authorization == .authorized else { return [] }
+        do {
+            let ids = try await store.saveFood(entry)
+            lastWriteError = nil
+            return ids
+        } catch {
+            lastWriteError = "That food was saved in Trekka but could not be written to Apple Health."
+            return []
+        }
+    }
+
+    /// Takes previously written food samples back out of Apple Health, so
+    /// deleting something from the diary does not leave Health overstating the day.
+    func deleteFoodSamples(_ ids: [UUID]) async {
+        guard isHealthDataAvailable, authorization == .authorized, !ids.isEmpty else { return }
+        try? await store.deleteFoodSamples(ids)
+    }
 }
 
 /// Isolated off the main actor so HealthKit queries never block the UI.
@@ -189,6 +213,11 @@ private actor HealthStore {
             HKObjectType.workoutType(),
             HKSeriesType.workoutRoute(),
         ]
+        // A logged food is a correlation grouping its nutrients, which is how
+        // the Health app itself models one meal.
+        if let food = HKCorrelationType.correlationType(forIdentifier: .food) {
+            types.insert(food)
+        }
         for identifier in Self.writeQuantities {
             if let type = HKQuantityType.quantityType(forIdentifier: identifier) {
                 types.insert(type)
@@ -228,6 +257,9 @@ private actor HealthStore {
         .distanceDownhillSnowSports,
         .runningSpeed, .runningPower, .cyclingSpeed, .cyclingPower, .cyclingCadence,
         .bodyMass, .dietaryWater,
+        // Food logged in the diary, written so the rest of the device sees it.
+        .dietaryEnergyConsumed, .dietaryProtein, .dietaryCarbohydrates, .dietaryFatTotal,
+        .dietaryFatSaturated, .dietarySugar, .dietaryFiber, .dietarySodium,
     ]
 
     private static let readCategories: [HKCategoryTypeIdentifier] = [
@@ -247,6 +279,18 @@ private actor HealthStore {
     /// Trekka; this is what an export or another app can still read.
     private static let strengthSetCountKey = "TrekkaStrengthSetCount"
     private static let strengthVolumeKey = "TrekkaStrengthVolume"
+
+    /// Health records the food's name natively; the brand and which sitting it
+    /// belonged to have no standard key, so they travel under Trekka's own.
+    private static let foodBrandKey = "TrekkaFoodBrand"
+    private static let foodMealKey = "TrekkaFoodMeal"
+
+    /// The nutrients a diary entry can contribute, paired with the unit Health
+    /// expects each in. Used both to write a food and to take one back out.
+    private static let dietaryQuantities: [HKQuantityTypeIdentifier] = [
+        .dietaryEnergyConsumed, .dietaryProtein, .dietaryCarbohydrates, .dietaryFatTotal,
+        .dietaryFatSaturated, .dietarySugar, .dietaryFiber, .dietarySodium,
+    ]
 
     func requestAuthorization() async -> Bool {
         do {
@@ -349,6 +393,103 @@ private actor HealthStore {
 
         guard let workout else { return }
         try await attachRoute(from: activity, to: workout)
+    }
+
+    /// Writes a logged food as a `.food` correlation.
+    ///
+    /// A correlation rather than loose samples, because that is what makes
+    /// Health show one named item you can tap into, instead of a scattering of
+    /// unattributed nutrient readings across the day.
+    ///
+    /// - Returns: the correlation's identifier and those of its nutrients, so
+    ///   the entry can be withdrawn later.
+    func saveFood(_ entry: FoodEntry) async throws -> [UUID] {
+        guard let correlationType = HKCorrelationType.correlationType(forIdentifier: .food) else {
+            return []
+        }
+
+        let facts = entry.facts
+        // A meal is an event, not a span, so it is written as an instant.
+        let date = entry.loggedAt
+
+        var samples: Set<HKSample> = []
+        func add(_ identifier: HKQuantityTypeIdentifier, _ unit: HKUnit, _ value: Double?) {
+            guard let value, value > 0, value.isFinite,
+                  let type = HKQuantityType.quantityType(forIdentifier: identifier) else { return }
+            samples.insert(
+                HKQuantitySample(
+                    type: type,
+                    quantity: HKQuantity(unit: unit, doubleValue: value),
+                    start: date,
+                    end: date
+                )
+            )
+        }
+
+        add(.dietaryEnergyConsumed, .kilocalorie(), facts.energyKilocalories)
+        add(.dietaryProtein, .gram(), facts.proteinGrams)
+        add(.dietaryCarbohydrates, .gram(), facts.carbohydrateGrams)
+        add(.dietaryFatTotal, .gram(), facts.fatGrams)
+        add(.dietaryFatSaturated, .gram(), facts.saturatedFatGrams)
+        add(.dietarySugar, .gram(), facts.sugarGrams)
+        add(.dietaryFiber, .gram(), facts.fibreGrams)
+        add(.dietarySodium, .gramUnit(with: .milli), facts.sodiumMilligrams)
+
+        // Nothing worth recording — a food with no energy and no macros.
+        guard !samples.isEmpty else { return [] }
+
+        var metadata: [String: Any] = [HKMetadataKeyFoodType: entry.food.name]
+        if let brand = entry.food.brand, !brand.isEmpty {
+            metadata[Self.foodBrandKey] = brand
+        }
+        metadata[Self.foodMealKey] = entry.meal.title
+
+        let correlation = HKCorrelation(
+            type: correlationType,
+            start: date,
+            end: date,
+            objects: samples,
+            metadata: metadata
+        )
+        try await store.save(correlation)
+        return [correlation.uuid] + samples.map(\.uuid)
+    }
+
+    /// Removes previously written food samples by identifier.
+    ///
+    /// Each type is asked separately because a query is always scoped to one
+    /// sample type; the identifier predicate means only Trekka's own samples
+    /// can ever come back.
+    func deleteFoodSamples(_ ids: [UUID]) async throws {
+        let unique = Set(ids)
+        guard !unique.isEmpty else { return }
+        let predicate = HKQuery.predicateForObjects(with: unique)
+
+        var types: [HKSampleType] = []
+        if let food = HKCorrelationType.correlationType(forIdentifier: .food) {
+            types.append(food)
+        }
+        for identifier in Self.dietaryQuantities {
+            if let type = HKQuantityType.quantityType(forIdentifier: identifier) {
+                types.append(type)
+            }
+        }
+
+        for type in types {
+            let objects: [HKObject] = await withCheckedContinuation { continuation in
+                let query = HKSampleQuery(
+                    sampleType: type,
+                    predicate: predicate,
+                    limit: HKObjectQueryNoLimit,
+                    sortDescriptors: nil
+                ) { _, samples, _ in
+                    continuation.resume(returning: samples ?? [])
+                }
+                store.execute(query)
+            }
+            guard !objects.isEmpty else { continue }
+            try await store.delete(objects)
+        }
     }
 
     /// Attaches the recorded track so the workout shows a real map in Health.

@@ -655,6 +655,7 @@
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Trekka Outdoors uses your location to record your route, pace and elevation during a workout.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Trekka Outdoors uses the camera to scan food barcodes so you can log what you eat without typing it in.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "Trekka Outdoors uses motion data to improve distance and elevation accuracy while you train.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -696,6 +697,7 @@
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Trekka Outdoors uses your location to record your route, pace and elevation during a workout.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Trekka Outdoors uses the camera to scan food barcodes so you can log what you eat without typing it in.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "Trekka Outdoors uses motion data to improve distance and elevation accuracy while you train.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

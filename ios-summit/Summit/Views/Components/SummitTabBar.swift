@@ -7,6 +7,7 @@ nonisolated enum AppTab: String, CaseIterable, Identifiable, Hashable, Sendable 
     case routes
     case calendar
     case activities
+    case fuel
     case settings
 
     var id: String { rawValue }
@@ -17,6 +18,7 @@ nonisolated enum AppTab: String, CaseIterable, Identifiable, Hashable, Sendable 
         case .routes: "Routes"
         case .calendar: "Calendar"
         case .activities: "Log"
+        case .fuel: "Fuel"
         case .settings: "Settings"
         }
     }
@@ -27,6 +29,7 @@ nonisolated enum AppTab: String, CaseIterable, Identifiable, Hashable, Sendable 
         case .routes: "map.fill"
         case .calendar: "calendar"
         case .activities: "waveform.path.ecg"
+        case .fuel: "fork.knife"
         case .settings: "gearshape.fill"
         }
     }

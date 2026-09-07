@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var appearance = AppearanceSettings()
     @State private var units = UnitSettings()
     @State private var mapPacks = MapPackStore()
+    @State private var nutrition = NutritionStore()
     @State private var watchLink = WatchLink.shared
 
     @State private var selectedTab: AppTab = .today
@@ -18,6 +19,7 @@ struct ContentView: View {
     @State private var routesPath = NavigationPath()
     @State private var calendarPath = NavigationPath()
     @State private var activitiesPath = NavigationPath()
+    @State private var fuelPath = NavigationPath()
     @State private var settingsPath = NavigationPath()
 
     @State private var showsWorkout = false
@@ -30,6 +32,7 @@ struct ContentView: View {
         case .routes: routesPath.isEmpty
         case .calendar: calendarPath.isEmpty
         case .activities: activitiesPath.isEmpty
+        case .fuel: fuelPath.isEmpty
         case .settings: settingsPath.isEmpty
         }
     }
@@ -42,6 +45,7 @@ struct ContentView: View {
             TabScreen(tab: .routes, selection: selectedTab) { routesScreen }
             TabScreen(tab: .calendar, selection: selectedTab) { calendarScreen }
             TabScreen(tab: .activities, selection: selectedTab) { activitiesScreen }
+            TabScreen(tab: .fuel, selection: selectedTab) { fuelScreen }
             TabScreen(tab: .settings, selection: selectedTab) { settingsScreen }
 
             if showsTabBar {
@@ -69,6 +73,7 @@ struct ContentView: View {
         .environment(appearance)
         .environment(units)
         .environment(mapPacks)
+        .environment(nutrition)
         .environment(\.unitSystem, units.system)
         .preferredColorScheme(appearance.colorScheme)
         .fullScreenCover(isPresented: $showsWorkout) {
@@ -198,6 +203,15 @@ struct ContentView: View {
         }
     }
 
+    private var fuelScreen: some View {
+        NavigationStack(path: $fuelPath) {
+            FuelView()
+                .navigationTitle("Fuel")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarBackground(Theme.canvas, for: .navigationBar)
+        }
+    }
+
     private var settingsScreen: some View {
         NavigationStack(path: $settingsPath) {
             SettingsView(path: $settingsPath)
@@ -225,6 +239,7 @@ struct ContentView: View {
             case .routes: routesPath = NavigationPath()
             case .calendar: calendarPath = NavigationPath()
             case .activities: activitiesPath = NavigationPath()
+            case .fuel: fuelPath = NavigationPath()
             case .settings: settingsPath = NavigationPath()
             }
         }
