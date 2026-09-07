@@ -5,6 +5,7 @@ struct SummaryView: View {
     let sport: WatchSport
     let metrics: LiveMetrics
     let laps: [WatchLap]
+    var strength: StrengthSession = StrengthSession()
     var onDone: () -> Void
 
     private var totalZoneSeconds: TimeInterval {
@@ -42,6 +43,10 @@ struct SummaryView: View {
                 }
                 .padding(9)
                 .watchPanel()
+
+                if !strength.isEmpty {
+                    strengthCard
+                }
 
                 effortCard
 
@@ -92,6 +97,48 @@ struct SummaryView: View {
                 .minimumScaleFactor(0.75)
                 .foregroundStyle(WatchTheme.textSecondary)
         }
+    }
+
+    /// What was actually lifted, which for a gym session is the session.
+    private var strengthCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Lifting")
+                    .fieldLabelStyle()
+                Spacer()
+                Text("\(strength.sets.count) sets")
+                    .font(.metric(13, weight: .bold))
+                    .foregroundStyle(WatchTheme.accent)
+            }
+
+            HStack(spacing: 8) {
+                Text("\(strength.totalReps) reps")
+                Text("\u{00b7}")
+                Text("\(WatchFormat.integer(WatchFormat.units.mass(fromKilograms: strength.totalVolume))) \(WatchFormat.units.massUnit) moved")
+            }
+            .font(.metric(11, weight: .semibold))
+            .foregroundStyle(WatchTheme.textSecondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+
+            VStack(spacing: WatchDisplay.spacing(3)) {
+                ForEach(strength.byExercise, id: \.exercise) { entry in
+                    HStack(alignment: .top, spacing: 6) {
+                        Text(entry.exercise)
+                            .font(.watch(10, weight: .semibold))
+                            .foregroundStyle(WatchTheme.textPrimary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                        Spacer(minLength: 2)
+                        Text("\(entry.sets.count)\u{00d7}")
+                            .font(.metric(10, weight: .bold))
+                            .foregroundStyle(WatchTheme.highlight)
+                    }
+                }
+            }
+        }
+        .padding(9)
+        .watchPanel()
     }
 
     private var effortCard: some View {

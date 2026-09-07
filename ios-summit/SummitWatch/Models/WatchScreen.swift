@@ -10,6 +10,7 @@ nonisolated enum WatchScreenKind: String, Codable, CaseIterable, Sendable, Ident
     case zones
     case laps
     case compass
+    case sets
 
     var id: String { rawValue }
 
@@ -23,6 +24,7 @@ nonisolated enum WatchScreenKind: String, Codable, CaseIterable, Sendable, Ident
         case .zones: "Heart Rate Zones"
         case .laps: "Laps"
         case .compass: "Compass"
+        case .sets: "Sets and Reps"
         }
     }
 
@@ -36,6 +38,7 @@ nonisolated enum WatchScreenKind: String, Codable, CaseIterable, Sendable, Ident
         case .zones: "chart.bar.fill"
         case .laps: "flag.checkered"
         case .compass: "location.north.circle.fill"
+        case .sets: "dumbbell.fill"
         }
     }
 
@@ -49,6 +52,7 @@ nonisolated enum WatchScreenKind: String, Codable, CaseIterable, Sendable, Ident
         case .zones: "Time in each heart-rate zone"
         case .laps: "Every split as you record it"
         case .compass: "Bearing and direction of travel"
+        case .sets: "Log every set as you lift it"
         }
     }
 

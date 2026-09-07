@@ -113,6 +113,11 @@ struct MetricDetailView: View {
                 }
                 rangePicker
                 chartCard(samples)
+                // Sleep is the one metric whose shape matters more than its
+                // total, so the night itself sits above the summary statistics.
+                if metric == .sleep {
+                    SleepStagesCard(night: health.sleepNight(for: selectedDate), day: selectedDate)
+                }
                 statsCard(samples)
                 if metric.isActivityDerived {
                     contributionsCard
@@ -146,6 +151,13 @@ struct MetricDetailView: View {
         .task(id: window) {
             guard let day = window.hourlyDay else { return }
             await health.loadDay(day)
+        }
+        // The stage breakdown is shown for whichever night is selected, at every
+        // range, so it needs that day loaded even when the chart above is not
+        // showing a single day.
+        .task(id: selectedDate) {
+            guard metric == .sleep else { return }
+            await health.loadDay(selectedDate)
         }
         .sheet(isPresented: $showsCalendar) {
             calendarSheet

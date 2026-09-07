@@ -25,6 +25,9 @@ struct WorkoutPagerView: View {
     @State private var isExploringMap = false
     /// Pause, lap and stop, swiped in from the left or long-pressed.
     @State private var showsMenu = false
+    /// The set logger, opened from the sets page. Like the map, it lives outside
+    /// the pager so the Digital Crown is free for its dials.
+    @State private var showsSetLogger = false
 
     /// The data pages, without the map: the map has its own gesture now, so
     /// leaving it in the vertical stack too would put it in two places at once.
@@ -52,7 +55,12 @@ struct WorkoutPagerView: View {
             case .acquiring:
                 acquiring
             case .finished:
-                SummaryView(sport: sport, metrics: engine.metrics, laps: engine.laps) {
+                SummaryView(
+                    sport: sport,
+                    metrics: engine.metrics,
+                    laps: engine.laps,
+                    strength: engine.strength
+                ) {
                     engine.reset()
                 }
             default:
@@ -139,7 +147,7 @@ struct WorkoutPagerView: View {
             // keeps owning it while invisible — hiding it and refusing its
             // touches is not enough. Left in place it swallowed every Crown turn
             // meant for the map, which on the wrist reads as zoom being dead.
-            if !showsMap {
+            if !showsMap && !showsSetLogger {
                 pager
                     .allowsHitTesting(!showsMenu && !showsEndConfirmation)
             }
@@ -147,6 +155,14 @@ struct WorkoutPagerView: View {
             if showsMap {
                 mapLayer
                     .transition(.move(edge: .trailing))
+            }
+
+            if showsSetLogger {
+                SetLoggerView(sport: sport) {
+                    showsSetLogger = false
+                    WKInterfaceDevice.current().play(.click)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
             if showsMenu {
@@ -159,7 +175,7 @@ struct WorkoutPagerView: View {
                     .transition(.opacity)
             }
         }
-        .overlay(alignment: .top) { if !showsMenu { statusBar } }
+        .overlay(alignment: .top) { if !showsMenu && !showsSetLogger { statusBar } }
         .overlay(alignment: .bottom) { lapBanner }
         .overlay(alignment: .center) { powerBanner }
         .overlay(alignment: .top) { if !showsMenu { navigationBanner } }
@@ -169,7 +185,7 @@ struct WorkoutPagerView: View {
         // drag belongs to the map alone, or every pan would turn the page too.
         .simultaneousGesture(
             sideSwipe,
-            including: isExploringMap || showsEndConfirmation ? .none : .all
+            including: isExploringMap || showsEndConfirmation || showsSetLogger ? .none : .all
         )
         // The press-and-hold shortcut to the controls has to stand down over the
         // map. It was racing every tap on the map's own buttons, so a quick tap
@@ -177,9 +193,10 @@ struct WorkoutPagerView: View {
         // page already has visible buttons for everything it does.
         .simultaneousGesture(
             LongPressGesture(minimumDuration: 0.45).onEnded { _ in openMenu() },
-            including: showsMap || showsEndConfirmation ? .none : .all
+            including: showsMap || showsEndConfirmation || showsSetLogger ? .none : .all
         )
         .animation(.snappy(duration: 0.28), value: showsMap)
+        .animation(.snappy(duration: 0.26), value: showsSetLogger)
         .animation(.snappy(duration: 0.24), value: showsMenu)
         .animation(.snappy(duration: 0.2), value: showsEndConfirmation)
         .animation(.snappy, value: engine.isPowerSaving)
@@ -430,6 +447,15 @@ struct WorkoutPagerView: View {
                 CompassPageView(heading: engine.heading, metrics: engine.metrics, route: route)
                     .padding(.horizontal, WatchDisplay.spacing(6))
                     .padding(.top, statusBarInset)
+            case .sets:
+                SetsPageView(
+                    sport: sport,
+                    session: engine.strength,
+                    currentExercise: engine.currentExercise,
+                    onLog: { showsSetLogger = true }
+                )
+                .padding(.horizontal, WatchDisplay.spacing(6))
+                .padding(.top, statusBarInset)
             }
         }
     }

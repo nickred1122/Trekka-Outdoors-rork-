@@ -64,6 +64,7 @@ struct WatchPagePreview: View {
         case .zones: zonesPreview
         case .laps: lapsPreview
         case .compass: compassPreview
+        case .sets: setsPreview
         }
     }
 
@@ -367,6 +368,48 @@ struct WatchPagePreview: View {
                         }
                     }
                     .frame(height: zone == 3 ? 8 : 6)
+                }
+            }
+        }
+    }
+
+    /// The gym logger, as it appears on the wrist: what you tap to log, then the
+    /// sets already banked for the movement you are on.
+    private var setsPreview: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 3) {
+                Image(systemName: "dumbbell.fill")
+                    .font(.system(size: 8, weight: .bold))
+                Text("Back Squat")
+                    .font(.system(size: 9, weight: .bold))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(Theme.canvas)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .background(Theme.accent, in: .rect(cornerRadius: 7))
+
+            HStack(spacing: 3) {
+                ForEach([("Sets", "4"), ("Reps", "32"), ("Volume", "2.6k")], id: \.0) { pair in
+                    VStack(spacing: 0) {
+                        Text(pair.1)
+                            .font(.system(size: 12, weight: .bold, design: .rounded).monospacedDigit())
+                            .foregroundStyle(Theme.textPrimary)
+                        Text(pair.0.uppercased())
+                            .font(.system(size: 6, weight: .bold))
+                            .foregroundStyle(Theme.textPrimary.opacity(0.45))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+                    .background(Theme.surfaceRaised, in: .rect(cornerRadius: 6))
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(["8 \u{00d7} 60", "8 \u{00d7} 80", "6 \u{00d7} 90"], id: \.self) { line in
+                    Text(line)
+                        .font(.system(size: 8, weight: .semibold, design: .rounded).monospacedDigit())
+                        .foregroundStyle(Theme.textPrimary.opacity(0.6))
                 }
             }
         }

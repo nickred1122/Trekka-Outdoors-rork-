@@ -216,7 +216,7 @@ nonisolated enum WatchMetric: String, CaseIterable, Codable, Identifiable, Senda
 }
 
 nonisolated enum WatchPageKind: String, Codable, CaseIterable, Sendable, Identifiable {
-    case data, map, elevation, climb, upAhead, zones, laps, compass
+    case data, map, elevation, climb, upAhead, zones, laps, compass, sets
 
     var id: String { rawValue }
 
@@ -230,6 +230,7 @@ nonisolated enum WatchPageKind: String, Codable, CaseIterable, Sendable, Identif
         case .zones: "Heart Rate Zones"
         case .laps: "Laps"
         case .compass: "Compass"
+        case .sets: "Sets and Reps"
         }
     }
 
@@ -243,6 +244,7 @@ nonisolated enum WatchPageKind: String, Codable, CaseIterable, Sendable, Identif
         case .zones: "chart.bar.fill"
         case .laps: "flag.checkered"
         case .compass: "location.north.circle.fill"
+        case .sets: "dumbbell.fill"
         }
     }
 
@@ -256,6 +258,7 @@ nonisolated enum WatchPageKind: String, Codable, CaseIterable, Sendable, Identif
         case .zones: "Time in each heart-rate zone"
         case .laps: "Every split as you record it"
         case .compass: "Bearing and direction of travel"
+        case .sets: "Log every set as you lift it"
         }
     }
 

@@ -526,9 +526,19 @@ nonisolated enum WatchSport: String, Codable, CaseIterable, Identifiable, Sendab
                 .data([.cadence, .power, .calories, .averagePace]),
                 .page(.zones),
             ]
-        case .strength, .hiit:
+        case .strength:
+            [
+                // Sets first: in a gym the logger is the screen you are actually
+                // using, and the metrics are what you glance at between them.
+                .page(.sets),
+                .data([.duration, .heartRate, .calories, .heartRateZone]),
+                .page(.zones),
+                .data([.lapTime, .lapCount, .averageHeartRate, .maxHeartRate]),
+            ]
+        case .hiit:
             [
                 .data([.duration, .heartRate, .calories, .heartRateZone]),
+                .page(.sets),
                 .page(.zones),
                 .data([.lapTime, .lapCount, .averageHeartRate, .maxHeartRate]),
             ]

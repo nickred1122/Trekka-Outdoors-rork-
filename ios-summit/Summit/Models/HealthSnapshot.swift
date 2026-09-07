@@ -6,6 +6,8 @@ nonisolated struct HealthSnapshot: Sendable, Equatable {
     var readinessCaption: String
     var sleepSeconds: TimeInterval
     var sleepScore: Int
+    /// Last night stage by stage. Empty when no tracker recorded stages.
+    var sleepNight: SleepNight = .empty
     var hrv: Double
     var hrvBaseline: Double
     var vo2Max: Double
@@ -44,6 +46,7 @@ nonisolated struct HealthSnapshot: Sendable, Equatable {
         readinessCaption: "No data yet",
         sleepSeconds: 0,
         sleepScore: 0,
+        sleepNight: .empty,
         hrv: 0,
         hrvBaseline: 0,
         vo2Max: 0,

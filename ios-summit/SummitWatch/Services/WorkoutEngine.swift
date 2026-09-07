@@ -30,6 +30,15 @@ final class WorkoutEngine {
     private(set) var metrics = LiveMetrics()
     private(set) var laps: [WatchLap] = []
     private(set) var track: [WatchTrackPoint] = []
+
+    /// Every set logged in this gym session.
+    private(set) var strength = StrengthSession()
+    /// The movement currently being worked through, kept so the logger reopens
+    /// where the athlete left off rather than back at the picker.
+    private(set) var currentExercise: GymExercise?
+    /// When the last set was logged, which is what the rest clock counts from.
+    /// Nil between exercises and before the first set.
+    private(set) var restStartedAt: Date?
     private(set) var isGPSLive = false
     private(set) var gpsBars = 0
     private(set) var isAutoPaused = false
@@ -638,6 +647,48 @@ final class WorkoutEngine {
         phase == .paused ? resume() : pause()
     }
 
+    // MARK: - Strength logging
+
+    /// Rest since the last set was logged. Recomputed on demand rather than
+    /// stored, because the workout ticker already redraws every second.
+    var restElapsed: TimeInterval {
+        guard let restStartedAt else { return 0 }
+        return max(0, Date().timeIntervalSince(restStartedAt))
+    }
+
+    func selectExercise(_ exercise: GymExercise) {
+        currentExercise = exercise
+        // A new movement means the rest clock is no longer measuring anything
+        // meaningful — it was timing recovery for a different lift.
+        restStartedAt = nil
+        WKInterfaceDevice.current().play(.click)
+    }
+
+    /// Banks one set and starts the rest clock.
+    func logSet(reps: Int, weightKilograms: Double) {
+        guard let currentExercise, reps > 0 else { return }
+        strength.sets.append(
+            StrengthSet(
+                exercise: currentExercise.name,
+                reps: reps,
+                weightKilograms: max(0, weightKilograms)
+            )
+        )
+        restStartedAt = Date()
+        if settings?.usesHapticAlerts ?? true {
+            WKInterfaceDevice.current().play(.success)
+        }
+    }
+
+    /// Undoes the most recent set — the fat-finger escape hatch, since a wrong
+    /// number is worse than no number.
+    func removeLastSet() {
+        guard !strength.sets.isEmpty else { return }
+        strength.sets.removeLast()
+        restStartedAt = strength.sets.isEmpty ? nil : Date()
+        WKInterfaceDevice.current().play(.directionDown)
+    }
+
     func markLap(automatic: Bool = false) {
         guard phase == .active || phase == .paused else { return }
         let lap = WatchLap(
@@ -751,6 +802,9 @@ final class WorkoutEngine {
         metrics = LiveMetrics()
         laps = []
         track = []
+        strength = StrengthSession()
+        currentExercise = nil
+        restStartedAt = nil
     }
 
     /// Hands the finished workout back to the paired iPhone over WatchConnectivity.

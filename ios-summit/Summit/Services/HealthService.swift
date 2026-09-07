@@ -34,6 +34,9 @@ final class HealthService {
     /// the start of that day. Today's hours live in `history`.
     private var hourlyByDay: [Date: [DashboardMetric: [Double]]] = [:]
     private var loadingDays: Set<Date> = []
+    /// Staged sleep for past nights the user has scrubbed back to, keyed by the
+    /// morning the night ended on. Last night lives in `snapshot`.
+    private var sleepByNight: [Date: SleepNight] = [:]
 
     private let store = HealthStore()
 
@@ -89,6 +92,7 @@ final class HealthService {
         }
         // Yesterday's hours may already be cached from a previous day's session.
         hourlyByDay.removeAll()
+        sleepByNight.removeAll()
     }
 
     // MARK: - Scrubbing to another day
@@ -114,7 +118,21 @@ final class HealthService {
 
         loadingDays.insert(key)
         defer { loadingDays.remove(key) }
-        hourlyByDay[key] = await store.loadHourly(for: key)
+        async let hourly = store.loadHourly(for: key)
+        async let stages = store.stages(forNightEnding: key)
+        hourlyByDay[key] = await hourly
+        sleepByNight[key] = await stages
+    }
+
+    /// The staged night ending on the given morning.
+    ///
+    /// Today resolves to last night, which is already loaded with the snapshot.
+    /// Any other day comes from the cache `loadDay` fills, so this returns an
+    /// empty night until that finishes rather than blocking the view.
+    func sleepNight(for date: Date) -> SleepNight {
+        let calendar = Calendar.current
+        guard !calendar.isDateInToday(date) else { return snapshot.sleepNight }
+        return sleepByNight[calendar.startOfDay(for: date)] ?? .empty
     }
 
     // MARK: - Writing back
@@ -368,6 +386,7 @@ private actor HealthStore {
             end: now
         )
         async let sleepValue = lastNightSleep()
+        async let sleepStagesValue = lastNightStages()
         async let workoutList = workouts(since: calendar.date(byAdding: .day, value: -365, to: now) ?? weekAgo)
 
         async let caloriesSeries = dailySeries(.activeEnergyBurned, unit: .kilocalorie(), days: 7)
@@ -394,14 +413,20 @@ private actor HealthStore {
         let steps = await stepsValue ?? 0
         let resting = await restingValue ?? 0
         let restingBaseline = await restingBaselineValue ?? resting
-        let sleep = await sleepValue
+        let sleepNight = await sleepStagesValue
+        // The staged timeline is the better answer when there is one, because it
+        // resolves disagreements between trackers rather than unioning them.
+        let mergedSleep = await sleepValue
+        let sleep = sleepNight.isEmpty ? mergedSleep : sleepNight.asleepSeconds
         let activities = await workoutList
 
         let hasAnyData = hrv > 0 || vo2 > 0 || calories > 0 || steps > 0 || sleep > 0 || !activities.isEmpty
         guard hasAnyData else { return LoadResult(snapshot: nil, activities: activities) }
 
         let load = trainingLoad(from: activities)
-        let sleepScore = sleepScore(for: sleep)
+        // With stages the score can weigh deep, REM and continuity; without them
+        // it stays the duration-only figure it has always been.
+        let sleepScore = sleepNight.isEmpty ? sleepScore(for: sleep) : sleepNight.quality
         let readiness = ReadinessCalculator.score(
             sleepSeconds: sleep,
             sleepScore: sleepScore,
@@ -426,6 +451,7 @@ private actor HealthStore {
             readinessCaption: ReadinessCalculator.caption(for: readiness),
             sleepSeconds: sleep,
             sleepScore: sleepScore,
+            sleepNight: sleepNight,
             hrv: hrv,
             hrvBaseline: hrvBaseline,
             vo2Max: vo2,
@@ -672,6 +698,78 @@ private actor HealthStore {
             }
         }
         return result
+    }
+
+    /// Last night broken into its stages.
+    ///
+    /// Deliberately separate from `sleepIntervals`, which merges everything into
+    /// plain asleep time for the year-long trend. Stage resolution is only worth
+    /// its cost for the handful of nights actually put on screen.
+    private func sleepSegments(start: Date, end: Date) async -> [(stage: SleepStage, start: Date, end: Date)] {
+        guard let type = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) else { return [] }
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: type,
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: nil
+            ) { _, samples, _ in
+                let mapped = (samples as? [HKCategorySample])?.compactMap {
+                    sample -> (stage: SleepStage, start: Date, end: Date)? in
+                    guard let stage = Self.stage(for: sample.value) else { return nil }
+                    let clippedStart = max(sample.startDate, start)
+                    let clippedEnd = min(sample.endDate, end)
+                    guard clippedEnd > clippedStart else { return nil }
+                    return (stage, clippedStart, clippedEnd)
+                } ?? []
+                continuation.resume(returning: mapped)
+            }
+            store.execute(query)
+        }
+    }
+
+    /// Health's raw category value translated into a stage.
+    ///
+    /// `inBed` is intentionally dropped: it says a tracker thought you were lying
+    /// down, not that you were asleep or awake, so letting it into the timeline
+    /// would stretch the night past when sleep actually started.
+    private static func stage(for value: Int) -> SleepStage? {
+        switch value {
+        case HKCategoryValueSleepAnalysis.asleepDeep.rawValue: .deep
+        case HKCategoryValueSleepAnalysis.asleepREM.rawValue: .rem
+        case HKCategoryValueSleepAnalysis.asleepCore.rawValue: .core
+        case HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue: .unspecified
+        case HKCategoryValueSleepAnalysis.awake.rawValue: .awake
+        default: nil
+        }
+    }
+
+    /// The staged timeline for the night that most recently ended.
+    func lastNightStages() async -> SleepNight {
+        let calendar = Calendar.current
+        let now = Date()
+        guard let windowStart = calendar.date(byAdding: .hour, value: -60, to: now) else { return .empty }
+        let samples = await sleepSegments(start: windowStart, end: now)
+        guard !samples.isEmpty else { return .empty }
+
+        // Keep only the most recent night, so the evening before last does not
+        // get spliced onto last night as one impossibly long sleep.
+        let latestEnd = samples.map(\.end).max() ?? now
+        let night = Self.nightKey(for: latestEnd, calendar: calendar)
+        let thisNight = samples.filter { Self.nightKey(for: $0.end, calendar: calendar) == night }
+        return SleepNight.resolving(thisNight)
+    }
+
+    /// The staged timeline for one specific night, filed under the morning it
+    /// ended on — the same rule the rest of the app uses.
+    func stages(forNightEnding day: Date) async -> SleepNight {
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: day)
+        guard let windowStart = calendar.date(byAdding: .hour, value: -6, to: start),
+              let windowEnd = calendar.date(byAdding: .hour, value: 18, to: start) else { return .empty }
+        let samples = await sleepSegments(start: windowStart, end: windowEnd)
+        return SleepNight.resolving(samples)
     }
 
     /// The morning a sleep interval belongs to.
