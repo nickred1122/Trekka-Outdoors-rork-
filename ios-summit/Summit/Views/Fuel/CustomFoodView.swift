@@ -5,6 +5,10 @@ import SwiftUI
 struct CustomFoodView: View {
     let meal: Meal
     let date: Date
+    /// What a nutrition-label scan read, when the athlete arrived that way.
+    /// Every value lands in an editable field rather than being saved directly:
+    /// recognised text is a good starting point, never a fact.
+    var prefill: NutritionLabelReading?
     var onDone: () -> Void
 
     @Environment(NutritionStore.self) private var nutrition
@@ -17,14 +21,28 @@ struct CustomFoodView: View {
     @State private var proteinText = ""
     @State private var carbsText = ""
     @State private var fatText = ""
+    @State private var saturatedText = ""
+    @State private var sugarText = ""
+    @State private var fibreText = ""
+    @State private var sodiumText = ""
     @State private var selectedMeal: Meal = .snacks
     @State private var hasPrepared = false
+    @State private var showsDetail = false
     @State private var feedback = 0
 
     @FocusState private var focused: Field?
 
     private enum Field: Hashable {
         case name, brand, serving, energy, protein, carbs, fat
+        case saturated, sugar, fibre, sodium
+    }
+
+    /// True when a scan could not work out what one serving weighs, so the
+    /// numbers on screen describe a serving of unknown size. Saving in that
+    /// state would scale everything by a guess, so the field is asked for.
+    private var needsServingWeight: Bool {
+        guard let prefill else { return false }
+        return prefill.basis == .perServing && prefill.servingGrams == nil
     }
 
     private var servingGrams: Double {
@@ -39,9 +57,11 @@ struct CustomFoodView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
+                if prefill != nil { scanBanner }
                 nameCard
                 servingCard
                 macrosCard
+                detailCard
                 mealCard
                 note
             }
@@ -66,10 +86,12 @@ struct CustomFoodView: View {
             }
         }
         .sensoryFeedback(.success, trigger: feedback)
+        .animation(.snappy(duration: 0.25), value: showsDetail)
         .onAppear {
             guard !hasPrepared else { return }
             hasPrepared = true
             selectedMeal = meal
+            applyPrefill()
         }
     }
 
@@ -111,6 +133,84 @@ struct CustomFoodView: View {
             numberField("Carbs", text: $carbsText, unit: "g", field: .carbs)
             Divider().overlay(Theme.border).padding(.leading, 14)
             numberField("Fat", text: $fatText, unit: "g", field: .fat)
+        }
+        .panel()
+    }
+
+    /// Says where these numbers came from and what still needs a human.
+    private var scanBanner: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: needsServingWeight ? "exclamationmark.triangle.fill" : "doc.text.viewfinder")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(needsServingWeight ? Theme.highlight : Theme.accent)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(needsServingWeight ? "Add the serving weight" : "Read from the label")
+                    .font(.system(.subheadline, weight: .bold))
+                    .foregroundStyle(Theme.textPrimary)
+                Text(scanDetail)
+                    .font(.caption)
+                    .foregroundStyle(Theme.textPrimary.opacity(0.6))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(13)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            (needsServingWeight ? Theme.highlight : Theme.accent).opacity(0.1),
+            in: .rect(cornerRadius: Theme.cardRadius)
+        )
+    }
+
+    private var scanDetail: String {
+        guard let prefill else { return "" }
+        if needsServingWeight {
+            return "The panel gave its values per serving but didn't say what a serving weighs. Enter it above, then check the rest."
+        }
+        if prefill.energyAgreesWithMacros == false {
+            return "Check these against the packet — the energy and the macros don't quite add up, so something may have been misread."
+        }
+        return "Check these against the packet before saving. Anything the label didn't print has been left blank."
+    }
+
+    /// The lines a label prints that the main card has no room for. Collapsed
+    /// by default, and left blank when the packet did not state them — a food
+    /// with no fibre figure must not be recorded as having none.
+    private var detailCard: some View {
+        VStack(spacing: 0) {
+            Button {
+                showsDetail.toggle()
+            } label: {
+                HStack(spacing: 10) {
+                    Text("More detail")
+                        .font(.system(.subheadline, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text("optional")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.textPrimary.opacity(0.4))
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary.opacity(0.35))
+                        .rotationEffect(.degrees(showsDetail ? 0 : -90))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 13)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+
+            if showsDetail {
+                Divider().overlay(Theme.border).padding(.leading, 14)
+                numberField("Saturates", text: $saturatedText, unit: "g", field: .saturated)
+                Divider().overlay(Theme.border).padding(.leading, 14)
+                numberField("Sugars", text: $sugarText, unit: "g", field: .sugar)
+                Divider().overlay(Theme.border).padding(.leading, 14)
+                numberField("Fibre", text: $fibreText, unit: "g", field: .fibre)
+                Divider().overlay(Theme.border).padding(.leading, 14)
+                numberField("Sodium", text: $sodiumText, unit: "mg", field: .sodium)
+            }
         }
         .panel()
     }
@@ -186,6 +286,46 @@ struct CustomFoodView: View {
         Double(text.replacingOccurrences(of: ",", with: "."))
     }
 
+    /// Fills the form from a label scan, in the units the form works in.
+    ///
+    /// The form is per serving, so a European panel's per-100 values are laid in
+    /// with a 100 g serving — which is exactly what that panel describes.
+    private func applyPrefill() {
+        guard let prefill else { return }
+
+        switch prefill.basis {
+        case .per100:
+            servingText = "100"
+        case .perServing:
+            servingText = prefill.servingGrams.map { format($0) } ?? ""
+        }
+
+        energyText = prefill.energyKilocalories.map { format($0) } ?? ""
+        proteinText = prefill.proteinGrams.map { format($0) } ?? ""
+        carbsText = prefill.carbohydrateGrams.map { format($0) } ?? ""
+        fatText = prefill.fatGrams.map { format($0) } ?? ""
+        saturatedText = prefill.saturatedFatGrams.map { format($0) } ?? ""
+        sugarText = prefill.sugarGrams.map { format($0) } ?? ""
+        fibreText = prefill.fibreGrams.map { format($0) } ?? ""
+        sodiumText = prefill.sodiumMilligrams.map { format($0) } ?? ""
+
+        // Opened when the scan actually found something to show, so the extra
+        // lines are not hidden behind a tap the athlete has no reason to make.
+        showsDetail = !saturatedText.isEmpty || !sugarText.isEmpty
+            || !fibreText.isEmpty || !sodiumText.isEmpty
+
+        if needsServingWeight {
+            focused = .serving
+        }
+    }
+
+    /// Trims a scanned value to something a person would have typed.
+    private func format(_ value: Double) -> String {
+        value == value.rounded()
+            ? String(Int(value))
+            : String(format: "%.1f", value)
+    }
+
     private func save() {
         guard canSave else { return }
 
@@ -196,7 +336,13 @@ struct CustomFoodView: View {
             energyKilocalories: (number(energyText) ?? 0) * factor,
             proteinGrams: (number(proteinText) ?? 0) * factor,
             carbohydrateGrams: (number(carbsText) ?? 0) * factor,
-            fatGrams: (number(fatText) ?? 0) * factor
+            fatGrams: (number(fatText) ?? 0) * factor,
+            // Left nil when the field is blank, so an unstated line stays
+            // unstated rather than being recorded as a zero.
+            saturatedFatGrams: number(saturatedText).map { $0 * factor },
+            sugarGrams: number(sugarText).map { $0 * factor },
+            fibreGrams: number(fibreText).map { $0 * factor },
+            sodiumMilligrams: number(sodiumText).map { $0 * factor }
         )
 
         let trimmedBrand = brand.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -13,6 +13,7 @@ struct FoodSearchView: View {
     @State private var isSearching = false
     @State private var message: String?
     @State private var isScanning = false
+    @State private var isScanningLabel = false
     @State private var isLookingUpBarcode = false
     @State private var path = NavigationPath()
 
@@ -26,6 +27,7 @@ struct FoodSearchView: View {
             ScrollView {
                 VStack(spacing: 12) {
                     scanButton
+                    labelScanButton
 
                     if let message {
                         notice(message)
@@ -65,12 +67,21 @@ struct FoodSearchView: View {
             .navigationDestination(for: FoodItem.self) { food in
                 FoodPortionView(food: food, meal: meal, date: date) { dismiss() }
             }
-            .navigationDestination(for: CustomFoodDestination.self) { _ in
-                CustomFoodView(meal: meal, date: date) { dismiss() }
+            .navigationDestination(for: CustomFoodDestination.self) { destination in
+                CustomFoodView(meal: meal, date: date, prefill: destination.prefill) { dismiss() }
             }
             .sheet(isPresented: $isScanning) {
                 BarcodeScannerView { code in
                     lookUp(barcode: code)
+                } onManualEntry: {
+                    path.append(CustomFoodDestination())
+                }
+            }
+            .sheet(isPresented: $isScanningLabel) {
+                LabelScannerView { reading in
+                    // Straight to the hand-entry form, prefilled. Recognised
+                    // text is a starting point, never good enough to log unseen.
+                    path.append(CustomFoodDestination(prefill: reading))
                 } onManualEntry: {
                     path.append(CustomFoodDestination())
                 }
@@ -102,6 +113,43 @@ struct FoodSearchView: View {
                         .font(.system(.subheadline, weight: .semibold))
                         .foregroundStyle(Theme.textPrimary)
                     Text("Fastest way to log something packaged")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textPrimary.opacity(0.5))
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.textPrimary.opacity(0.3))
+            }
+            .padding(12)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
+        .panel(radius: 14)
+    }
+
+    /// For everything with a nutrition table but no usable barcode — loose
+    /// bakery items, foreign packaging, or a product the database has never seen.
+    private var labelScanButton: some View {
+        Button {
+            message = nil
+            isScanningLabel = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "doc.text.viewfinder")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 34, height: 34)
+                    .background(Theme.accent.opacity(0.12), in: .rect(cornerRadius: 10))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Scan a nutrition label")
+                        .font(.system(.subheadline, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text("Read the panel when there is no barcode")
                         .font(.caption)
                         .foregroundStyle(Theme.textPrimary.opacity(0.5))
                 }
@@ -300,5 +348,7 @@ struct FoodSearchView: View {
     }
 }
 
-/// Routes to the hand-entry screen.
-nonisolated struct CustomFoodDestination: Hashable, Sendable {}
+/// Routes to the hand-entry screen, optionally carrying what a label scan read.
+nonisolated struct CustomFoodDestination: Hashable, Sendable {
+    var prefill: NutritionLabelReading?
+}

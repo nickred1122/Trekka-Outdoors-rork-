@@ -12,6 +12,9 @@ struct ContentView: View {
     @State private var units = UnitSettings()
     @State private var mapPacks = MapPackStore()
     @State private var nutrition = NutritionStore()
+    @State private var onboarding = OnboardingState()
+    @State private var cloudBackup = CloudBackupService()
+    @State private var autoBackup = AutoBackupSettings()
     @State private var watchLink = WatchLink.shared
 
     @State private var selectedTab: AppTab = .today
@@ -74,8 +77,18 @@ struct ContentView: View {
         .environment(units)
         .environment(mapPacks)
         .environment(nutrition)
+        .environment(cloudBackup)
+        .environment(autoBackup)
         .environment(\.unitSystem, units.system)
         .preferredColorScheme(appearance.colorScheme)
+        .fullScreenCover(isPresented: .constant(!onboarding.isComplete)) {
+            OnboardingView { onboarding.complete() }
+                .environment(health)
+                .environment(units)
+                .environment(watchLayout)
+                .environment(nutrition)
+                .environment(\.unitSystem, units.system)
+        }
         .fullScreenCover(isPresented: $showsWorkout) {
             LiveWorkoutView(initialRoute: pendingWorkoutRoute)
                 .environment(store)
@@ -87,6 +100,15 @@ struct ContentView: View {
                 .reformatsOnUnitChange(units.changeToken)
         }
         .task {
+            // Somebody already using Trekka should not be walked through first
+            // run, and must certainly not be offered defaults that would
+            // overwrite the units and goals they have already chosen.
+            onboarding.skipForExistingUser(
+                hasData: !store.routes.isEmpty
+                    || !store.activities.isEmpty
+                    || !nutrition.entries.isEmpty
+            )
+
             watchLink.activate()
 
             // The watch reads its units out of the layout document, so the two
@@ -137,6 +159,9 @@ struct ContentView: View {
             // outing from a familiar start already has its map. Done after the
             // launch work above so it never competes with it.
             mapPacks.refreshHomeAreas(from: store.activities)
+
+            // Last, and quietly: a backup must never delay the app opening.
+            await autoBackup.runIfDue(cloud: cloudBackup, stores: backupStores)
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
@@ -144,6 +169,9 @@ struct ContentView: View {
             // Health sharing can be changed in the Health app while this app is
             // in the background, so the state is re-read on the way back in.
             Task { await health.resume() }
+            // iOS promises no background window, so a scheduled backup is taken
+            // whenever the app is genuinely in front of the athlete again.
+            Task { await autoBackup.runIfDue(cloud: cloudBackup, stores: backupStores) }
         }
         .onChange(of: dashboardSettings.preferencesTransfer) { _, _ in
             pushDashboard()
@@ -227,6 +255,18 @@ struct ContentView: View {
                     }
                 }
         }
+    }
+
+    /// Everything a backup reads from, gathered once.
+    private var backupStores: BackupStores {
+        BackupStores(
+            routes: store,
+            watchLayout: watchLayout,
+            dashboard: dashboardSettings,
+            appearance: appearance,
+            units: units,
+            mapPacks: mapPacks
+        )
     }
 
     // MARK: - Navigation helpers

@@ -98,6 +98,8 @@ struct TodayView: View {
                     .buttonStyle(TilePressStyle())
                 }
 
+                TrainingInsightsCard(activities: allActivities, snapshot: snapshot)
+
                 startWorkoutCard
 
                 if settings.showsRecentActivity, let latest = store.latestActivity {

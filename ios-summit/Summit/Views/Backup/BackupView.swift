@@ -35,7 +35,11 @@ struct BackupView: View {
     @Environment(UnitSettings.self) private var units
     @Environment(MapPackStore.self) private var mapPacks
 
-    @State private var cloud = CloudBackupService()
+    // Shared with the app itself rather than owned here, so a scheduled backup
+    // and this screen are always describing the same thing.
+    @Environment(CloudBackupService.self) private var cloud
+    @Environment(AutoBackupSettings.self) private var autoBackup
+
     @State private var selection: Set<BackupSection> = Set(BackupSection.allCases)
 
     @State private var exportDocument: BackupFileDocument?
@@ -68,6 +72,7 @@ struct BackupView: View {
             VStack(spacing: 14) {
                 if !resultLines.isEmpty { resultBanner }
                 cloudCard
+                automaticSection
                 includeSection
                 fileSection
                 footnote
@@ -221,6 +226,102 @@ struct BackupView: View {
             return "Nothing backed up yet — your data stays on this phone."
         }
         return "Last backup \(last.formatted(.relative(presentation: .named)))"
+    }
+
+    // MARK: - Automatic backup
+
+    private var automaticSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Automatic backup")
+                .metricLabelStyle()
+                .padding(.leading, 4)
+
+            VStack(spacing: 0) {
+                ForEach(Array(BackupSchedule.allCases.enumerated()), id: \.element) { index, option in
+                    if index > 0 { divider }
+                    scheduleRow(option)
+                }
+
+                divider
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(automaticStatusLine)
+                        .font(.caption)
+                        .foregroundStyle(Theme.textPrimary.opacity(0.5))
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if case .failed(let reason) = autoBackup.lastOutcome {
+                        HStack(alignment: .top, spacing: 7) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Theme.highlight)
+                            Text("Last automatic backup didn't finish: \(reason)")
+                                .font(.caption)
+                                .foregroundStyle(Theme.textPrimary.opacity(0.7))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+            }
+            .panel()
+        }
+    }
+
+    private func scheduleRow(_ option: BackupSchedule) -> some View {
+        let isOn = autoBackup.schedule == option
+        return Button {
+            withAnimation(.snappy(duration: 0.2)) {
+                autoBackup.setSchedule(option)
+            }
+            feedback += 1
+            // Turning it on should mean something immediately, rather than the
+            // first backup landing at some unannounced moment later.
+            if option != .off {
+                Task { await autoBackup.runIfDue(cloud: cloud, stores: stores) }
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: isOn ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(isOn ? Theme.accent : Theme.textPrimary.opacity(0.25))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(option.title)
+                        .font(.system(.subheadline, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text(option.detail)
+                        .font(.caption)
+                        .foregroundStyle(Theme.textPrimary.opacity(0.5))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 0)
+
+                if isOn && autoBackup.isRunning {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(Theme.accent)
+                }
+            }
+            .padding(12)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var automaticStatusLine: String {
+        guard autoBackup.schedule != .off else {
+            return "Everything is included when this is on — your routes, activities, watch screens and app settings."
+        }
+        if !cloud.availability.isReady {
+            return cloud.availability.message
+        }
+        guard let next = autoBackup.nextRunAt else {
+            return "Backs up everything, including your watch screens. The first one runs now."
+        }
+        return "Next backup \(next.formatted(.relative(presentation: .named))), when you open Trekka. Includes your watch screens."
     }
 
     // MARK: - Selection
@@ -391,6 +492,11 @@ struct BackupView: View {
         let archive = BackupArchive.make(sections: selection, from: stores)
         let stored = await cloud.backUp(archive, sections: selection)
         guard stored else { return }
+        // A backup by hand pushes the scheduled one out, so opening the app
+        // right afterwards does not immediately repeat the whole upload.
+        if selection.count == BackupSection.allCases.count {
+            autoBackup.recordBackup()
+        }
         resultLines = selection.count == BackupSection.allCases.count
             ? ["Everything backed up to iCloud"]
             : ["Backed up to iCloud: " + BackupSection.ordered
