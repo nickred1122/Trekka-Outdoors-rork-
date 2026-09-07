@@ -39,6 +39,8 @@ struct ExpandedMapWatchView: View {
     /// view up close and invisible when zoomed out.
     @State private var zoomExponent: Double = Self.defaultExponent
     @FocusState private var isCrownFocused: Bool
+    /// The running claim, so a fresh one replaces it rather than racing it.
+    @State private var crownClaim: Task<Void, Never>?
 
     private static let minimumSpanMetres: Double = 120
     private static let maximumSpanMetres: Double = 24_000
@@ -77,7 +79,34 @@ struct ExpandedMapWatchView: View {
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { isCrownFocused = true }
+        .onAppear { claimCrown() }
+        .onDisappear {
+            crownClaim?.cancel()
+            crownClaim = nil
+        }
+    }
+
+    /// Takes the Crown for the map, and keeps asking until it sticks.
+    ///
+    /// A single claim in `onAppear` happens while the push is still animating
+    /// and the outgoing screen is still mounted, so it is the claim most likely
+    /// to be refused — and there was nothing behind it. The ladder spans the
+    /// transition instead.
+    ///
+    /// It only ever asks. Writing `false` into a `@FocusState` is not a way to
+    /// re-trigger a claim, it is an instruction to give the Crown away.
+    private func claimCrown() {
+        crownClaim?.cancel()
+        crownClaim = Task {
+            for delay in [0, 150, 450] {
+                guard !Task.isCancelled else { return }
+                if delay > 0 {
+                    try? await Task.sleep(for: .milliseconds(delay))
+                    guard !Task.isCancelled else { return }
+                }
+                isCrownFocused = true
+            }
+        }
     }
 
     private var map: some View {
@@ -128,6 +157,9 @@ struct ExpandedMapWatchView: View {
         let next: Double = zoomExponent + direction * Self.buttonStep
         zoomExponent = min(max(next, Self.minimumExponent), Self.maximumExponent)
         WKInterfaceDevice.current().play(.click)
+        // Tapping a control is also the moment to make sure the Crown still
+        // belongs to the map, so the two ways of zooming cannot fight.
+        claimCrown()
     }
 
     private func zoomButton(

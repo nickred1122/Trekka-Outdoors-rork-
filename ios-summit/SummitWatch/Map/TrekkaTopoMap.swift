@@ -60,6 +60,16 @@ nonisolated struct TopoFocus: Equatable {
     }
 }
 
+/// One frame's worth of what the map draws.
+///
+/// Exists so the Canvas renders from values captured while `body` ran, rather
+/// than reaching into the observable model as it draws. See the note in `body`.
+private struct TopoScene {
+    let camera: TopoCamera
+    let tiles: [TopoTileKey: TopoDrawTile]
+    let contours: [TopoTileKey: TopoContourDrawTile]
+}
+
 /// Trekka's own topographic map.
 ///
 /// Drawn from OpenStreetMap vector tiles and on-device contour tracing rather
@@ -116,8 +126,33 @@ struct TrekkaTopoMap: View {
     @State private var hasFramed = false
 
     var body: some View {
-        GeometryReader { proxy in
-            canvas(size: proxy.size)
+        // Read here, in the body itself, and deliberately not inside the Canvas.
+        //
+        // This is what made Crown zoom look broken. `model` is @Observable, and
+        // SwiftUI only records a dependency on the properties a view reads while
+        // its `body` is running. The drawing closure handed to `Canvas` runs
+        // later, during the render pass, outside that recording — so every read
+        // of `model.camera` in there was invisible to SwiftUI. Changing the zoom
+        // updated the camera and invalidated nothing, and the map only caught up
+        // when something else happened to force a redraw: a tile arriving, a GPS
+        // fix, a chip appearing.
+        //
+        // Panning and pinching hid the fault, because both also write @State the
+        // view genuinely reads — `dragTranslation` and `pinchScale` — so they
+        // always came with a redraw of their own. The Crown writes nothing but
+        // the camera, which is why zoom alone was the interaction that looked
+        // dead while every other gesture worked.
+        //
+        // Taking the snapshot up here makes the camera and the tiles real
+        // dependencies, so changing the zoom *is* a redraw.
+        let scene = TopoScene(
+            camera: model.camera,
+            tiles: model.drawTiles,
+            contours: model.contourDrawTiles
+        )
+
+        return GeometryReader { proxy in
+            canvas(scene: scene, size: proxy.size)
                 .contentShape(.rect)
                 .gesture(panGesture, isEnabled: allowsPan)
                 .modifier(TopoPinchToZoom(isEnabled: allowsZoom, scale: $pinchScale, onCommit: commitZoom))
@@ -251,17 +286,17 @@ struct TrekkaTopoMap: View {
 
     // MARK: - Canvas
 
-    private func canvas(size: CGSize) -> some View {
+    private func canvas(scene: TopoScene, size: CGSize) -> some View {
         Canvas(opaque: true, rendersAsynchronously: false) { context, canvasSize in
-            draw(context: &context, size: canvasSize)
+            draw(scene: scene, context: &context, size: canvasSize)
         }
     }
 
-    private func draw(context: inout GraphicsContext, size canvasSize: CGSize) {
+    private func draw(scene: TopoScene, context: inout GraphicsContext, size canvasSize: CGSize) {
         let paperRect = CGRect(origin: .zero, size: canvasSize)
         context.fill(Path(paperRect), with: .color(palette.paper))
 
-        let camera = model.camera
+        let camera = scene.camera
         let centreWorld = camera.centreWorldPixels
 
         // Cull against a circle around the camera centre. With the centre pushed
@@ -282,11 +317,11 @@ struct TrekkaTopoMap: View {
             context.rotate(by: .degrees(-heading))
         }
 
-        drawBasemap(context: &context, camera: camera, centreWorld: centreWorld, radius: radius)
+        drawBasemap(scene: scene, context: &context, centreWorld: centreWorld, radius: radius)
         drawOverlay(context: &context, camera: camera, centreWorld: centreWorld, radius: radius)
 
         if showsPlaceLabels {
-            drawLabels(context: &context, camera: camera, centreWorld: centreWorld, radius: radius)
+            drawLabels(scene: scene, context: &context, centreWorld: centreWorld, radius: radius)
         }
     }
 
@@ -296,11 +331,12 @@ struct TrekkaTopoMap: View {
     /// neighbour's footpaths at the seam. Bucket-major keeps the layering
     /// continuous across the whole screen.
     private func drawBasemap(
+        scene: TopoScene,
         context: inout GraphicsContext,
-        camera: TopoCamera,
         centreWorld: CGPoint,
         radius: Double
     ) {
+        let camera = scene.camera
         for bucket in TopoBucket.allCases {
             let isContour: Bool = bucket == .contour || bucket == .contourIndex
             if isContour && !showsContours { continue }
@@ -309,7 +345,7 @@ struct TrekkaTopoMap: View {
             let shading = GraphicsContext.Shading.color(paint.colour.opacity(paint.opacity))
 
             if isContour {
-                for tile in model.contourDrawTiles.values {
+                for tile in scene.contours.values {
                     guard let transform = tileTransform(
                         key: tile.key,
                         camera: camera,
@@ -327,7 +363,7 @@ struct TrekkaTopoMap: View {
             // A road casing is the road's own geometry drawn wider underneath.
             let geometryBucket: TopoBucket = bucket == .roadCasing ? .road : bucket
 
-            for tile in model.drawTiles.values {
+            for tile in scene.tiles.values {
                 guard let path = tile.paths[geometryBucket], !path.isEmpty else { continue }
                 guard let transform = tileTransform(
                     key: tile.key,
@@ -558,12 +594,13 @@ struct TrekkaTopoMap: View {
     // MARK: - Labels
 
     private func drawLabels(
+        scene: TopoScene,
         context: inout GraphicsContext,
-        camera: TopoCamera,
         centreWorld: CGPoint,
         radius: Double
     ) {
-        for tile in model.drawTiles.values {
+        let camera = scene.camera
+        for tile in scene.tiles.values {
             guard !tile.labels.isEmpty else { continue }
             guard let transform = tileTransform(
                 key: tile.key,
