@@ -326,7 +326,7 @@ struct MetricDetailWatchView: View {
             WatchFormat.units.distance(fromMetres: value * 1000),
             places: 1
         ) + " \(WatchFormat.units.distanceUnit)"
-        case .elevation: WatchFormat.elevation(value) + " \(WatchFormat.units.elevationUnit)"
+        case .elevation: WatchFormat.elevation(value) + " \(WatchFormat.elevationUnits.elevationUnit)"
         case .pace: WatchFormat.pace(value)
         case .exercise: WatchFormat.integer(value) + " min"
         case .flights: WatchFormat.integer(value)

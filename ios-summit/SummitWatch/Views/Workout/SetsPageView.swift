@@ -12,7 +12,8 @@ struct SetsPageView: View {
 
     @Environment(WatchScreenSettings.self) private var settings
 
-    private var units: UnitSystem { settings.unitSystem }
+    /// Mass conversion only — the set list has no distances to speak of.
+    private var units: UnitSystem { settings.massSystem }
 
     var body: some View {
         ScrollView {

@@ -25,6 +25,18 @@ nonisolated struct WorkoutSummaryTransfer: Codable, Sendable {
     var trainingEffect: Double
     var zoneSeconds: [Double]
     var track: [TrackPoint]
+    /// Sets logged in the gym on the wrist, weight always in kilograms.
+    /// Optional so summaries sent by earlier watch builds still decode.
+    var strengthSets: [StrengthSetTransfer]?
+
+    /// One set as it was actually lifted, crossing from the wrist to the phone.
+    nonisolated struct StrengthSetTransfer: Codable, Sendable, Hashable {
+        var id: UUID
+        var exercise: String
+        var reps: Int
+        var weightKilograms: Double
+        var loggedAt: Date
+    }
 }
 
 /// The paired watch's physical screen, reported by the watch itself so the
@@ -367,6 +379,16 @@ extension WorkoutSummaryTransfer {
             zones[index] = seconds / 60
         }
 
+        let sets = (strengthSets ?? []).map { set in
+            StrengthSet(
+                id: set.id,
+                exercise: set.exercise,
+                reps: set.reps,
+                weightKilograms: set.weightKilograms,
+                loggedAt: set.loggedAt
+            )
+        }
+
         return ActivityRecord(
             id: id,
             name: routeName ?? "\(profile?.title ?? sport) · Watch",
@@ -379,7 +401,8 @@ extension WorkoutSummaryTransfer {
             calories: calories,
             trainingEffect: trainingEffect,
             track: track.map { RoutePoint(latitude: $0.latitude, longitude: $0.longitude, elevation: $0.elevation) },
-            zoneMinutes: zones
+            zoneMinutes: zones,
+            strengthSets: sets
         )
     }
 
@@ -387,6 +410,7 @@ extension WorkoutSummaryTransfer {
         switch family {
         case .ride: return .ride
         case .run: return .run
+        case .gym: return .strength
         default: return .hike
         }
     }

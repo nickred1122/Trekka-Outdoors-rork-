@@ -19,6 +19,61 @@ struct ActivityDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
+                if activity.isStrengthSession {
+                    strengthContent
+                } else {
+                    outdoorContent
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 28)
+        }
+        .scrollIndicators(.hidden)
+        .background(Theme.canvas)
+        .navigationTitle(activity.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .tabBar)
+    }
+
+    /// A gym session: what was lifted, in sets, with the totals that track
+    /// progress. None of the trail machinery — splits, pace, maps — applies.
+    @ViewBuilder
+    private var strengthContent: some View {
+        StatStrip(items: [
+            StatItem(symbol: "dumbbell.fill", label: "Volume", value: Formatters.integer(strengthVolume), unit: Formatters.massUnit),
+            StatItem(symbol: "number", label: "Sets", value: "\(activity.strengthSets.count)", unit: ""),
+            StatItem(symbol: "clock", label: "Time", value: Formatters.duration(activity.duration), unit: ""),
+        ])
+
+        if !activity.strengthSets.isEmpty {
+            setsCard
+        }
+
+        if activity.averageHeartRate > 0 || activity.calories > 0 {
+            StatStrip(items: [
+                StatItem(
+                    symbol: "heart.fill",
+                    label: "Avg HR",
+                    value: activity.averageHeartRate > 0 ? Formatters.integer(activity.averageHeartRate) : "--",
+                    unit: "bpm"
+                ),
+                StatItem(
+                    symbol: "flame.fill",
+                    label: "Calories",
+                    value: activity.calories > 0 ? Formatters.integer(activity.calories) : "--",
+                    unit: "kcal"
+                ),
+            ])
+        }
+
+        ZoneBars(minutes: activity.zoneMinutes, title: "Time in zones", subtitle: "This session")
+
+        sessionCard
+    }
+
+    private var outdoorContent: some View {
+        VStack(spacing: 14) {
                 if activity.track.count > 1 {
                     TrekkaMapSurface(
                         routePoints: activity.track,
@@ -41,7 +96,7 @@ struct ActivityDetailView: View {
                 ])
 
                 StatStrip(items: [
-                    StatItem(symbol: "arrow.up.forward", label: "Climb", value: Formatters.elevation(activity.elevationGain), unit: Formatters.units.elevationUnit),
+                    StatItem(symbol: "arrow.up.forward", label: "Climb", value: Formatters.elevation(activity.elevationGain), unit: Formatters.elevationUnit),
                     StatItem(symbol: "heart.fill", label: "Avg HR", value: Formatters.integer(activity.averageHeartRate), unit: "bpm"),
                     StatItem(symbol: "flame.fill", label: "Calories", value: Formatters.integer(activity.calories), unit: "kcal"),
                 ])
@@ -68,16 +123,64 @@ struct ActivityDetailView: View {
                 trainingEffectCard
 
                 sessionCard
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 28)
         }
-        .scrollIndicators(.hidden)
-        .background(Theme.canvas)
-        .navigationTitle(activity.name)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
+    }
+
+    /// Total load shifted, the headline number of a gym session.
+    private var strengthVolume: Double {
+        activity.strengthSets.reduce(0) { $0 + $1.volume }
+    }
+
+    /// The session's sets grouped per movement, in the order they were worked —
+    /// the same grouping the wrist summary uses.
+    private var groupedSets: [(exercise: String, sets: [StrengthSet])] {
+        StrengthSession(sets: activity.strengthSets).byExercise
+    }
+
+    /// Every movement of the session in the order it was worked, each with its
+    /// sets written the way a training log reads: `8 × 60`.
+    private var setsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Sets")
+                    .font(.system(.subheadline, weight: .semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                Spacer()
+                Text("\(Formatters.integer(Double(activity.strengthSets.reduce(0) { $0 + $1.reps }))) reps")
+                    .font(.caption)
+                    .foregroundStyle(Theme.textPrimary.opacity(0.5))
+            }
+
+            VStack(spacing: 8) {
+                ForEach(groupedSets, id: \.exercise) { entry in
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(entry.exercise)
+                            .font(.system(.subheadline, weight: .semibold))
+                            .foregroundStyle(Theme.textPrimary)
+                            .lineLimit(1)
+                        Text(entry.sets.enumerated().map { index, set in
+                            setLabel(set, position: index + 1)
+                        }.joined(separator: "   "))
+                            .font(.metric(13))
+                            .monospacedDigit()
+                            .foregroundStyle(Theme.textPrimary.opacity(0.75))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(Theme.surface, in: .rect(cornerRadius: 10))
+                }
+            }
+        }
+        .padding(16)
+        .panel()
+    }
+
+    /// One set in the log line, weight shown in the athlete's own unit — the
+    /// stored kilograms convert only here, at the moment of display.
+    private func setLabel(_ set: StrengthSet, position: Int) -> String {
+        guard !set.isBodyweight else { return "\(position) · \(set.reps) BW" }
+        let shown = Formatters.integer(Formatters.mass(fromKilograms: set.weightKilograms))
+        return "\(position) · \(set.reps) × \(shown)"
     }
 
     /// The second rank of numbers, derived from the track. Each one is absent
@@ -93,7 +196,7 @@ struct ActivityDetailView: View {
                     symbol: "arrow.down.forward",
                     label: "Descent",
                     value: hasDescent ? Formatters.elevation(analysis.elevationLoss) : "--",
-                    unit: Formatters.units.elevationUnit
+                    unit: Formatters.elevationUnit
                 ),
                 StatItem(
                     symbol: "figure.walk.motion",
@@ -118,13 +221,13 @@ struct ActivityDetailView: View {
                     symbol: "mountain.2.fill",
                     label: "High point",
                     value: Formatters.elevation(analysis.highestPoint),
-                    unit: Formatters.units.elevationUnit
+                    unit: Formatters.elevationUnit
                 ),
                 StatItem(
                     symbol: "arrow.down.to.line",
                     label: "Low point",
                     value: Formatters.elevation(analysis.lowestPoint),
-                    unit: Formatters.units.elevationUnit
+                    unit: Formatters.elevationUnit
                 ),
                 StatItem(
                     symbol: "angle",

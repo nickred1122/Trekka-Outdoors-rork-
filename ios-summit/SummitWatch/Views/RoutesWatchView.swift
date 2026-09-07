@@ -116,7 +116,7 @@ struct RoutesWatchView: View {
                     .lineLimit(1)
                 HStack(spacing: 5) {
                     Text("\(WatchFormat.distance(route.distance)) \(WatchFormat.units.distanceUnit)")
-                    Text("↑\(WatchFormat.elevation(route.elevationGain)) \(WatchFormat.units.elevationUnit)")
+                    Text("↑\(WatchFormat.elevation(route.elevationGain)) \(WatchFormat.elevationUnits.elevationUnit)")
                         .foregroundStyle(WatchTheme.highlight)
                 }
                 .font(.metric(9, weight: .medium))
@@ -268,8 +268,8 @@ struct RouteDetailWatchView: View {
 
                 VStack(spacing: 5) {
                     WatchStatRow(title: "Distance", value: "\(WatchFormat.distance(route.distance)) \(WatchFormat.units.distanceUnit)")
-                    WatchStatRow(title: "Ascent", value: "\(WatchFormat.elevation(route.elevationGain)) \(WatchFormat.units.elevationUnit)", tint: WatchTheme.highlight)
-                    WatchStatRow(title: "High point", value: "\(WatchFormat.elevation(route.maxElevation)) \(WatchFormat.units.elevationUnit)")
+                    WatchStatRow(title: "Ascent", value: "\(WatchFormat.elevation(route.elevationGain)) \(WatchFormat.elevationUnits.elevationUnit)", tint: WatchTheme.highlight)
+                    WatchStatRow(title: "High point", value: "\(WatchFormat.elevation(route.maxElevation)) \(WatchFormat.elevationUnits.elevationUnit)")
                     WatchStatRow(title: "Est. time", value: WatchFormat.compactDuration(route.estimatedDuration(for: route.sport)))
                     WatchStatRow(title: "Waypoints", value: "\(route.waypoints.count)")
                 }

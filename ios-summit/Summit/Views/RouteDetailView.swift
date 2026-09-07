@@ -143,7 +143,7 @@ struct RouteDetailView: View {
 
                 StatStrip(items: [
                     StatItem(symbol: "arrow.left.and.right", label: "Distance", value: Formatters.distance(route.distance), unit: Formatters.units.distanceUnit),
-                    StatItem(symbol: "arrow.up.forward", label: "Elev. gain", value: Formatters.elevation(route.elevationGain), unit: "\(Formatters.units.elevationUnit) ↑"),
+                    StatItem(symbol: "arrow.up.forward", label: "Elev. gain", value: Formatters.elevation(route.elevationGain), unit: "\(Formatters.elevationUnit) ↑"),
                     StatItem(symbol: "clock", label: "Est. time", value: Formatters.compactDuration(route.estimatedDuration), unit: "est"),
                 ])
 
@@ -182,7 +182,7 @@ struct RouteDetailView: View {
                     .font(.system(.subheadline, weight: .semibold))
                     .foregroundStyle(Theme.textPrimary)
                 Spacer()
-                Text("\(climbs.count) · \(Formatters.elevation(climbs.reduce(0) { $0 + $1.gain })) \(Formatters.units.elevationUnit) ↑")
+                Text("\(climbs.count) · \(Formatters.elevation(climbs.reduce(0) { $0 + $1.gain })) \(Formatters.elevationUnit) ↑")
                     .font(.system(.caption, weight: .medium))
                     .monospacedDigit()
                     .foregroundStyle(Theme.textPrimary.opacity(0.55))
@@ -242,7 +242,7 @@ struct RouteDetailView: View {
             Spacer(minLength: 0)
 
             VStack(alignment: .trailing, spacing: 1) {
-                Text("\(Formatters.elevation(climb.gain)) \(Formatters.units.elevationUnit)")
+                Text("\(Formatters.elevation(climb.gain)) \(Formatters.elevationUnit)")
                     .font(.system(size: 13, weight: .bold))
                     .monospacedDigit()
                     .foregroundStyle(Theme.textPrimary)
@@ -263,7 +263,7 @@ struct RouteDetailView: View {
                     .font(.system(.subheadline, weight: .semibold))
                     .foregroundStyle(Theme.textPrimary)
                 Spacer()
-                Text("\(Formatters.elevation(route.minElevation))–\(Formatters.elevation(route.maxElevation)) \(Formatters.units.elevationUnit)")
+                Text("\(Formatters.elevation(route.minElevation))–\(Formatters.elevation(route.maxElevation)) \(Formatters.elevationUnit)")
                     .font(.system(.caption, weight: .medium))
                     .monospacedDigit()
                     .foregroundStyle(Theme.textPrimary.opacity(0.6))
@@ -301,7 +301,7 @@ struct RouteDetailView: View {
                                 .foregroundStyle(Theme.textPrimary.opacity(0.5))
                         }
                         Spacer(minLength: 0)
-                        Text("\(Formatters.elevation(waypoint.elevation)) \(Formatters.units.elevationUnit)")
+                        Text("\(Formatters.elevation(waypoint.elevation)) \(Formatters.elevationUnit)")
                             .font(.system(.subheadline, weight: .medium))
                             .monospacedDigit()
                             .foregroundStyle(Theme.textPrimary.opacity(0.75))
@@ -587,7 +587,7 @@ private struct WaypointSheet: View {
                     .clipShape(.rect(cornerRadius: 14))
 
                     StatStrip(items: [
-                        StatItem(symbol: "arrow.up.forward", label: "Elevation", value: Formatters.elevation(waypoint.elevation), unit: Formatters.units.elevationUnit),
+                        StatItem(symbol: "arrow.up.forward", label: "Elevation", value: Formatters.elevation(waypoint.elevation), unit: Formatters.elevationUnit),
                         StatItem(symbol: "arrow.left.and.right", label: "Into route", value: Formatters.distance(waypoint.distanceAlongRoute), unit: Formatters.units.distanceUnit),
                     ])
 

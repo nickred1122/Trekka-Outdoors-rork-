@@ -118,20 +118,39 @@ extension View {
     /// Rebuilds this screen when the units change.
     ///
     /// Formatting happens deep inside child views and inside model helpers, so
-    /// there is no single value to observe. Tying the screen's identity to the
-    /// unit system redraws the lot, which is cheap because it only ever happens
-    /// when the athlete flips the setting.
-    func reformatsOnUnitChange(_ system: UnitSystem) -> some View {
-        id(system)
+    /// there is no single value to observe. Tying the screen's identity to a
+    /// units token redraws the lot, which is cheap because it only ever happens
+    /// when the athlete flips a setting. The token carries all three choices —
+    /// system, mass and elevation — so any of them lands everywhere.
+    func reformatsOnUnitChange(_ token: some Hashable) -> some View {
+        id(token)
     }
 }
 
 /// The persisted units preference, read by every formatter on the phone.
+///
+/// Three choices live here: the overall system — which also drives distance,
+/// speed and pace — plus independent overrides for mass and elevation, so an
+/// athlete who lifts in kilograms but climbs in feet is never asked to pick one.
 @Observable
 final class UnitSettings {
     private static let storageKey = "units.system.v1"
+    private static let massKey = "units.mass.v1"
+    private static let elevationKey = "units.elevation.v1"
 
     private(set) var system: UnitSystem
+    private var massOverride: UnitSystem?
+    private var elevationOverride: UnitSystem?
+
+    /// What weights print in — kilograms or pounds.
+    var massUnits: UnitSystem { massOverride ?? system }
+    /// What heights and climbs print in — metres or feet.
+    var elevationUnits: UnitSystem { elevationOverride ?? system }
+
+    /// Everything that should rebuild when any units choice changes.
+    var changeToken: String {
+        "\(system.rawValue)|\(massUnits.rawValue)|\(elevationUnits.rawValue)"
+    }
 
     /// Called after a change so the watch can be brought into line.
     var onChange: ((UnitSystem) -> Void)?
@@ -139,22 +158,44 @@ final class UnitSettings {
     init() {
         let stored = UserDefaults.standard.string(forKey: Self.storageKey)
         system = stored.flatMap(UnitSystem.init(rawValue:)) ?? .deviceDefault
-        Formatters.units = system
+        massOverride = UserDefaults.standard.string(forKey: Self.massKey).flatMap(UnitSystem.init(rawValue:))
+        elevationOverride = UserDefaults.standard.string(forKey: Self.elevationKey).flatMap(UnitSystem.init(rawValue:))
+        refreshFormatters()
     }
 
     func set(_ newSystem: UnitSystem) {
         guard newSystem != system else { return }
         system = newSystem
-        Formatters.units = newSystem
         UserDefaults.standard.set(newSystem.rawValue, forKey: Self.storageKey)
+        refreshFormatters()
         onChange?(newSystem)
+    }
+
+    func setMass(_ newSystem: UnitSystem) {
+        guard newSystem != massOverride else { return }
+        massOverride = newSystem
+        UserDefaults.standard.set(newSystem.rawValue, forKey: Self.massKey)
+        refreshFormatters()
+    }
+
+    func setElevation(_ newSystem: UnitSystem) {
+        guard newSystem != elevationOverride else { return }
+        elevationOverride = newSystem
+        UserDefaults.standard.set(newSystem.rawValue, forKey: Self.elevationKey)
+        refreshFormatters()
     }
 
     /// Applies a choice made on the watch without echoing it straight back.
     func applyFromWatch(_ newSystem: UnitSystem) {
         guard newSystem != system else { return }
         system = newSystem
-        Formatters.units = newSystem
         UserDefaults.standard.set(newSystem.rawValue, forKey: Self.storageKey)
+        refreshFormatters()
+    }
+
+    private func refreshFormatters() {
+        Formatters.units = system
+        Formatters.massSystem = massUnits
+        Formatters.elevationSystem = elevationUnits
     }
 }

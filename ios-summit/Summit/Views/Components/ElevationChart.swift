@@ -116,7 +116,7 @@ struct ElevationChart: View {
                     AxisGridLine().foregroundStyle(Theme.border.opacity(0.6))
                     AxisValueLabel {
                         if let elevation = value.as(Double.self) {
-                            Text("\(Formatters.elevation(elevation)) \(Formatters.units.elevationUnit)")
+                            Text("\(Formatters.elevation(elevation)) \(Formatters.elevationUnit)")
                                 .font(.caption2)
                                 .foregroundStyle(Theme.textPrimary.opacity(0.5))
                         }

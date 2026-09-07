@@ -79,7 +79,7 @@ struct ClimbPageView: View {
                 readout(
                     "CLIMB LEFT",
                     value: WatchFormat.elevation(toGo),
-                    unit: WatchFormat.units.elevationUnit,
+                    unit: WatchFormat.elevationUnits.elevationUnit,
                     tint: WatchTheme.highlight
                 )
                 readout(
@@ -158,7 +158,7 @@ struct ClimbPageView: View {
                 readout(
                     "GAIN",
                     value: WatchFormat.elevation(climb.gain),
-                    unit: WatchFormat.units.elevationUnit,
+                    unit: WatchFormat.elevationUnits.elevationUnit,
                     tint: WatchTheme.highlight
                 )
                 readout(
@@ -183,7 +183,7 @@ struct ClimbPageView: View {
                 .foregroundStyle(WatchTheme.textPrimary)
                 .multilineTextAlignment(.center)
             if !climbs.isEmpty {
-                Text("\(climbs.count) climbed · \(WatchFormat.elevation(climbs.reduce(0) { $0 + $1.gain })) \(WatchFormat.units.elevationUnit) total")
+                Text("\(climbs.count) climbed · \(WatchFormat.elevation(climbs.reduce(0) { $0 + $1.gain })) \(WatchFormat.elevationUnits.elevationUnit) total")
                     .font(.watch(9))
                     .foregroundStyle(WatchTheme.textSecondary)
                     .multilineTextAlignment(.center)

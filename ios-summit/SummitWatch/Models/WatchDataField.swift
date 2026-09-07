@@ -242,7 +242,7 @@ nonisolated enum WatchDataField: String, CaseIterable, Codable, Identifiable, Se
         case .heartRateZone: return ""
         case .percentMaxHeartRate, .grade, .routeProgress, .percentHeartRateReserve: return "%"
         case .altitude, .ascent, .descent, .remainingAscent, .lapAscent, .lastLapAscent,
-             .maxAltitude, .minAltitude, .remainingDescent, .routeAscent: return units.elevationUnit
+             .maxAltitude, .minAltitude, .remainingDescent, .routeAscent: return WatchFormat.elevationUnits.elevationUnit
         case .distanceToWaypoint, .offCourse: return units.shortDistanceUnit
         case .verticalSpeed: return units.verticalSpeedUnit
         case .calories: return "kcal"

@@ -22,7 +22,7 @@ struct ElevationPageView: View {
                 return ProfilePoint(
                     id: index,
                     distance: WatchFormat.units.distance(fromMetres: distances[index]),
-                    elevation: WatchFormat.units.elevation(fromMetres: point.elevation)
+                    elevation: WatchFormat.elevationUnits.elevation(fromMetres: point.elevation)
                 )
             }
         }
@@ -30,7 +30,7 @@ struct ElevationPageView: View {
             ProfilePoint(
                 id: index,
                 distance: WatchFormat.units.distance(fromMetres: point.distance),
-                elevation: WatchFormat.units.elevation(fromMetres: point.altitude)
+                elevation: WatchFormat.elevationUnits.elevation(fromMetres: point.altitude)
             )
         }
     }

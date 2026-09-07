@@ -159,7 +159,7 @@ nonisolated enum PersonalRecords {
                     kind: .effort,
                     glyph: .elevation,
                     value: Formatters.elevation(highest.elevationGain),
-                    unit: Formatters.units.elevationUnit,
+                    unit: Formatters.elevationUnit,
                     achievedAt: highest.startDate,
                     activityName: highest.name,
                     activityID: highest.id

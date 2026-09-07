@@ -24,6 +24,18 @@ nonisolated struct WorkoutSummaryTransfer: Codable, Sendable {
     var trainingEffect: Double
     var zoneSeconds: [Double]
     var track: [TrackPoint]
+    /// Sets logged in the gym on the wrist, weight always in kilograms.
+    /// Optional so summaries sent by earlier watch builds still decode.
+    var strengthSets: [StrengthSetTransfer]?
+
+    /// One set as it was actually lifted, crossing from the wrist to the phone.
+    nonisolated struct StrengthSetTransfer: Codable, Sendable, Hashable {
+        var id: UUID
+        var exercise: String
+        var reps: Int
+        var weightKilograms: Double
+        var loggedAt: Date
+    }
 }
 
 /// This watch's physical screen, so the phone can size its layout builder to

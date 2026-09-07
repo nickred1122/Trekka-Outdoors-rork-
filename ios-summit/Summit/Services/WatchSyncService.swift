@@ -58,6 +58,9 @@ nonisolated struct WatchRouteTransfer: Codable, Sendable {
         case .run: return "trailRun"
         case .ride: return "ride"
         case .hike: return "hike"
+        // Strength sessions are not routed, but routes only ever carry the
+        // three outdoor types — this arm exists for exhaustiveness.
+        case .strength: return "strength"
         }
     }
 }

@@ -87,6 +87,21 @@ final class WatchScreenSettings {
             persist()
         }
     }
+    /// Weights print in kilograms or pounds — the dial, the set list and the
+    /// summary all read this. Independent of the system above.
+    var massSystem: UnitSystem = .deviceDefault {
+        didSet {
+            WatchFormat.massUnits = massSystem
+            persist()
+        }
+    }
+    /// Heights and climbs print in metres or feet.
+    var elevationSystem: UnitSystem = .deviceDefault {
+        didSet {
+            WatchFormat.elevationUnits = elevationSystem
+            persist()
+        }
+    }
 
     private let defaultsKey = "watch.screens.v1"
 
@@ -98,6 +113,8 @@ final class WatchScreenSettings {
         load()
         LiveMetrics.maxHeartRateCeiling = Double(maxHeartRate)
         WatchFormat.units = unitSystem
+        WatchFormat.massUnits = massSystem
+        WatchFormat.elevationUnits = elevationSystem
         applyMetricStyle()
     }
 
@@ -285,8 +302,12 @@ final class WatchScreenSettings {
         maxHeartRate = payload.maxHeartRate
         poolLengthMetres = payload.poolLengthMetres ?? poolLengthMetres
         unitSystem = payload.unitSystem.flatMap(UnitSystem.init(rawValue:)) ?? unitSystem
+        massSystem = payload.massSystem.flatMap(UnitSystem.init(rawValue:)) ?? massSystem
+        elevationSystem = payload.elevationSystem.flatMap(UnitSystem.init(rawValue:)) ?? elevationSystem
         LiveMetrics.maxHeartRateCeiling = Double(maxHeartRate)
         WatchFormat.units = unitSystem
+        WatchFormat.massUnits = massSystem
+        WatchFormat.elevationUnits = elevationSystem
         applyMetricStyle()
     }
 
@@ -323,6 +344,8 @@ final class WatchScreenSettings {
         var usesNavigationAlerts: Bool?
         var isReroutingEnabled: Bool?
         var unitSystem: String?
+        var massSystem: String?
+        var elevationSystem: String?
         var countdownSeconds: Int?
         var usesPreciseStart: Bool?
         var showsStatusBadges: Bool?
@@ -362,6 +385,8 @@ final class WatchScreenSettings {
         maxHeartRate = payload.maxHeartRate
         poolLengthMetres = payload.poolLengthMetres ?? 25
         unitSystem = payload.unitSystem.flatMap(UnitSystem.init(rawValue:)) ?? .deviceDefault
+        massSystem = payload.massSystem.flatMap(UnitSystem.init(rawValue:)) ?? .deviceDefault
+        elevationSystem = payload.elevationSystem.flatMap(UnitSystem.init(rawValue:)) ?? .deviceDefault
     }
 
     private func persist() {
@@ -383,6 +408,8 @@ final class WatchScreenSettings {
             usesNavigationAlerts: usesNavigationAlerts,
             isReroutingEnabled: isReroutingEnabled,
             unitSystem: unitSystem.rawValue,
+            massSystem: massSystem.rawValue,
+            elevationSystem: elevationSystem.rawValue,
             countdownSeconds: countdownSeconds,
             usesPreciseStart: usesPreciseStart,
             showsStatusBadges: showsStatusBadges,

@@ -81,7 +81,7 @@ struct SportSetupView: View {
                         } label: {
                             routeOption(
                                 name: route.name,
-                                detail: "\(WatchFormat.distance(route.distance)) \(WatchFormat.units.distanceUnit) · ↑\(WatchFormat.elevation(route.elevationGain)) \(WatchFormat.units.elevationUnit)",
+                                detail: "\(WatchFormat.distance(route.distance)) \(WatchFormat.units.distanceUnit) · ↑\(WatchFormat.elevation(route.elevationGain)) \(WatchFormat.elevationUnits.elevationUnit)",
                                 isSelected: selectedRouteID == route.id
                             )
                         }

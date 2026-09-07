@@ -94,7 +94,7 @@ nonisolated enum WatchMetric: String, CaseIterable, Codable, Identifiable, Senda
         case .heartRateZone, .trainingEffect, .lapCount, .gpsSignal: return ""
         case .percentMaxHeartRate, .grade, .battery, .routeProgress, .percentHeartRateReserve: return "%"
         case .altitude, .ascent, .descent, .remainingAscent, .lapAscent, .lastLapAscent,
-             .maxAltitude, .minAltitude, .remainingDescent, .routeAscent: return units.elevationUnit
+             .maxAltitude, .minAltitude, .remainingDescent, .routeAscent: return Formatters.elevationUnit
         case .verticalSpeed: return units.verticalSpeedUnit
         case .calories: return "kcal"
         case .power: return "W"

@@ -53,12 +53,14 @@ nonisolated enum RouteActivityType: String, Codable, CaseIterable, Sendable {
     case run = "Trail Run"
     case ride = "Ride"
     case hike = "Hike"
+    case strength = "Strength"
 
     var symbol: String {
         switch self {
         case .run: "figure.run"
         case .ride: "bicycle"
         case .hike: "figure.hiking"
+        case .strength: "dumbbell.fill"
         }
     }
 
@@ -68,6 +70,7 @@ nonisolated enum RouteActivityType: String, Codable, CaseIterable, Sendable {
         case .run: 2.9
         case .ride: 5.6
         case .hike: 1.3
+        case .strength: 0
         }
     }
 }

@@ -32,7 +32,7 @@ struct SummaryView: View {
                     )
                     WatchStatRow(
                         title: "Ascent",
-                        value: "\(WatchFormat.elevation(metrics.ascent)) \(WatchFormat.units.elevationUnit)"
+                        value: "\(WatchFormat.elevation(metrics.ascent)) \(WatchFormat.elevationUnits.elevationUnit)"
                     )
                     WatchStatRow(
                         title: "Avg HR",
@@ -114,7 +114,7 @@ struct SummaryView: View {
             HStack(spacing: 8) {
                 Text("\(strength.totalReps) reps")
                 Text("\u{00b7}")
-                Text("\(WatchFormat.integer(WatchFormat.units.mass(fromKilograms: strength.totalVolume))) \(WatchFormat.units.massUnit) moved")
+                Text("\(WatchFormat.integer(WatchFormat.massUnits.mass(fromKilograms: strength.totalVolume))) \(WatchFormat.massUnit) moved")
             }
             .font(.metric(11, weight: .semibold))
             .foregroundStyle(WatchTheme.textSecondary)

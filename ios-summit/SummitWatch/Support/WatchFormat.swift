@@ -5,7 +5,15 @@ nonisolated enum WatchFormat {
     /// The athlete's chosen units, mirrored here by `WatchScreenSettings` so
     /// every cell converts the same way without threading a preference through
     /// each view.
+    ///
+    /// `units` drives distance, speed and pace; mass and elevation carry their
+    /// own choices, so a lifter can work in kilos while climbing in feet.
     static var units: UnitSystem = .deviceDefault
+    static var massUnits: UnitSystem = .deviceDefault
+    static var elevationUnits: UnitSystem = .deviceDefault
+
+    /// The weight unit the athlete reads in — kilograms or pounds.
+    static var massUnit: String { massUnits.massUnit }
 
     /// `1:04:22` or `4:22`.
     static func duration(_ seconds: TimeInterval) -> String {
@@ -55,10 +63,11 @@ nonisolated enum WatchFormat {
             : units.distanceUnit
     }
 
-    /// Height or vertical gain, in metres or feet.
+    /// Height or vertical gain, in metres or feet — the athlete's own vertical
+    /// choice, which can differ from the system they read distances in.
     static func elevation(_ metres: Double) -> String {
         guard metres.isFinite else { return "--" }
-        return "\(Int(units.elevation(fromMetres: metres).rounded()))"
+        return "\(Int(elevationUnits.elevation(fromMetres: metres).rounded()))"
     }
 
     /// Minutes per kilometre or per mile as `5:42`.

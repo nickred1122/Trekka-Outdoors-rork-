@@ -382,15 +382,43 @@ struct WatchSettingsView: View {
                             .tag(system)
                     }
                 } label: {
-                    Text("Units").font(.system(size: 12))
+                    Text("Distance & speed").font(.system(size: 12))
+                }
+                .pickerStyle(.navigationLink)
+
+                // Weight and elevation carry their own choices, so a lifter in
+                // kilos can still climb in feet without touching the system above.
+                Picker(
+                    selection: Binding(
+                        get: { settings.massSystem },
+                        set: { settings.massSystem = $0 }
+                    )
+                ) {
+                    Text("Kilograms (kg)").font(.system(size: 13)).tag(UnitSystem.metric)
+                    Text("Pounds (lb)").font(.system(size: 13)).tag(UnitSystem.imperial)
+                } label: {
+                    Text("Weight").font(.system(size: 12))
+                }
+                .pickerStyle(.navigationLink)
+
+                Picker(
+                    selection: Binding(
+                        get: { settings.elevationSystem },
+                        set: { settings.elevationSystem = $0 }
+                    )
+                ) {
+                    Text("Metres (m)").font(.system(size: 13)).tag(UnitSystem.metric)
+                    Text("Feet (ft)").font(.system(size: 13)).tag(UnitSystem.imperial)
+                } label: {
+                    Text("Elevation").font(.system(size: 12))
                 }
                 .pickerStyle(.navigationLink)
             } header: {
                 Text("Units")
             } footer: {
                 Text(settings.unitSystem == .metric
-                     ? "Kilometres, metres, km/h"
-                     : "Miles, feet, mph")
+                     ? "Kilometres, metres, km/h — weight and elevation can differ."
+                     : "Miles, feet, mph — weight and elevation can differ.")
                     .font(.system(size: 9))
             }
 

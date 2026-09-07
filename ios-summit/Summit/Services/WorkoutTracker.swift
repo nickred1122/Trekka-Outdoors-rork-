@@ -254,6 +254,9 @@ final class WorkoutTracker {
         case .run: 12.5
         case .ride: 9.5
         case .hike: 7.5
+        // Phone-recorded strength sessions have no route, so only the burn
+        // estimate matters here.
+        case .strength: 5.5
         }
         return minutes * base + elevationGain * 0.9
     }

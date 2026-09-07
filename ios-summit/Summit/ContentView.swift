@@ -54,10 +54,11 @@ struct ContentView: View {
         }
         // Units are converted deep inside child views and model helpers, so no
         // single value can be observed to catch a change. Rebuilding the screens
-        // when the setting flips is what makes it actually land everywhere. The
+        // when the token changes is what makes it actually land everywhere. The
+        // token covers the system plus the mass and elevation overrides, and the
         // navigation paths live in this view's own state, outside the rebuilt
         // subtree, so nobody gets thrown back to a root screen.
-        .reformatsOnUnitChange(units.system)
+        .reformatsOnUnitChange(units.changeToken)
         .animation(.snappy(duration: 0.26), value: showsTabBar)
         .tint(Theme.accent)
         .environment(store)
@@ -78,7 +79,7 @@ struct ContentView: View {
                 .environment(units)
                 .environment(mapPacks)
                 .environment(\.unitSystem, units.system)
-                .reformatsOnUnitChange(units.system)
+                .reformatsOnUnitChange(units.changeToken)
         }
         .task {
             watchLink.activate()
@@ -88,6 +89,12 @@ struct ContentView: View {
             // somebody happens to open the designer.
             if watchLayout.unitSystem != units.system {
                 watchLayout.unitSystem = units.system
+            }
+            if watchLayout.massSystem != units.massUnits {
+                watchLayout.massSystem = units.massUnits
+            }
+            if watchLayout.elevationSystem != units.elevationUnits {
+                watchLayout.elevationSystem = units.elevationUnits
             }
 
             // Watch workouts arrive here and join the phone's activity history.

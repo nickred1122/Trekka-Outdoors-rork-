@@ -65,6 +65,11 @@ final class WatchLayoutStore {
     /// Metric or imperial, carried in the same document as the layout so the
     /// watch reads its units from exactly the file it reads its pages from.
     var unitSystem: UnitSystem = .deviceDefault { didSet { persist() } }
+    /// Weights print in kilograms or pounds on the wrist. Part of the same
+    /// document so both devices quote the same mass unit.
+    var massSystem: UnitSystem = .deviceDefault { didSet { persist() } }
+    /// Heights and climbs print in metres or feet on the wrist.
+    var elevationSystem: UnitSystem = .deviceDefault { didSet { persist() } }
 
     private let defaultsKey = "watch.screens.v1"
     private var deliveryTask: Task<Void, Never>?
@@ -247,6 +252,8 @@ final class WatchLayoutStore {
         maxHeartRate = payload.maxHeartRate
         poolLengthMetres = payload.poolLengthMetres ?? poolLengthMetres
         unitSystem = payload.unitSystem.flatMap(UnitSystem.init(rawValue:)) ?? unitSystem
+        massSystem = payload.massSystem.flatMap(UnitSystem.init(rawValue:)) ?? massSystem
+        elevationSystem = payload.elevationSystem.flatMap(UnitSystem.init(rawValue:)) ?? elevationSystem
         routeTrailColor = TrailColor.resolve(payload.routeTrailColor) ?? routeTrailColor
         breadcrumbTrailColor = TrailColor.resolve(payload.breadcrumbTrailColor) ?? breadcrumbTrailColor
         metricTypeface = payload.metricTypeface ?? metricTypeface
@@ -306,6 +313,8 @@ final class WatchLayoutStore {
         var usesNavigationAlerts: Bool?
         var isReroutingEnabled: Bool?
         var unitSystem: String?
+        var massSystem: String?
+        var elevationSystem: String?
         var routeTrailColor: String?
         var breadcrumbTrailColor: String?
         var metricTypeface: String?
@@ -340,6 +349,8 @@ final class WatchLayoutStore {
         maxHeartRate = payload.maxHeartRate
         poolLengthMetres = payload.poolLengthMetres ?? 25
         unitSystem = payload.unitSystem.flatMap(UnitSystem.init(rawValue:)) ?? .deviceDefault
+        massSystem = payload.massSystem.flatMap(UnitSystem.init(rawValue:)) ?? .deviceDefault
+        elevationSystem = payload.elevationSystem.flatMap(UnitSystem.init(rawValue:)) ?? .deviceDefault
         usesNavigationAlerts = payload.usesNavigationAlerts ?? true
         isReroutingEnabled = payload.isReroutingEnabled ?? true
         routeTrailColor = TrailColor.resolve(payload.routeTrailColor) ?? .orange
@@ -368,6 +379,8 @@ final class WatchLayoutStore {
             usesNavigationAlerts: usesNavigationAlerts,
             isReroutingEnabled: isReroutingEnabled,
             unitSystem: unitSystem.rawValue,
+            massSystem: massSystem.rawValue,
+            elevationSystem: elevationSystem.rawValue,
             routeTrailColor: routeTrailColor.rawValue,
             breadcrumbTrailColor: breadcrumbTrailColor.rawValue,
             metricTypeface: metricTypeface,

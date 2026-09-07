@@ -186,7 +186,7 @@ nonisolated enum DashboardMetric: String, CaseIterable, Codable, Sendable, Ident
         case .pace: return Formatters.pace(value)
         case .exercise, .flights: return Formatters.integer(value)
         case .respiratoryRate: return String(format: "%.1f", value)
-        case .bodyMass: return String(format: "%.1f", Formatters.units.mass(fromKilograms: value))
+        case .bodyMass: return String(format: "%.1f", Formatters.mass(fromKilograms: value))
         }
     }
 
@@ -197,11 +197,11 @@ nonisolated enum DashboardMetric: String, CaseIterable, Codable, Sendable, Ident
         case .restingHeartRate: "bpm"
         case .calories: "kcal"
         case .distance: Formatters.units.distanceUnit
-        case .elevation: Formatters.units.elevationUnit
+        case .elevation: Formatters.elevationUnit
         case .pace: Formatters.units.paceUnit
         case .exercise: "min"
         case .respiratoryRate: "br/min"
-        case .bodyMass: Formatters.units.massUnit
+        case .bodyMass: Formatters.massUnit
         case .sleep, .vo2Max, .load, .steps, .flights: nil
         }
     }
@@ -259,13 +259,13 @@ nonisolated enum DashboardMetric: String, CaseIterable, Codable, Sendable, Ident
         case .restingHeartRate: "\(Int(value.rounded())) bpm"
         case .distance:
             String(format: "%.1f %@", Formatters.units.distance(fromMetres: value * 1000), Formatters.units.distanceUnit)
-        case .elevation: "\(Formatters.elevation(value)) \(Formatters.units.elevationUnit)"
+        case .elevation: "\(Formatters.elevation(value)) \(Formatters.elevationUnit)"
         case .pace: Formatters.pace(value)
         case .exercise: "\(Int(value.rounded())) min"
         case .flights: "\(Int(value.rounded())) flights"
         case .respiratoryRate: String(format: "%.1f br/min", value)
         case .bodyMass:
-            String(format: "%.1f %@", Formatters.units.mass(fromKilograms: value), Formatters.units.massUnit)
+            String(format: "%.1f %@", Formatters.mass(fromKilograms: value), Formatters.massUnit)
         }
     }
 }
@@ -406,7 +406,7 @@ nonisolated enum MetricReadings {
             metric: .elevation,
             value: elevationSeries.reduce(0, +),
             displayValue: Formatters.elevation(elevationSeries.reduce(0, +)),
-            unit: Formatters.units.elevationUnit,
+            unit: Formatters.elevationUnit,
             suffix: nil,
             series: elevationSeries,
             insight: elevationInsight(metres: elevationSeries.reduce(0, +), distanceKm: weekDistance)
@@ -464,14 +464,14 @@ nonisolated enum MetricReadings {
             metric: .bodyMass,
             value: snapshot.bodyMass,
             displayValue: snapshot.bodyMass > 0
-                ? String(format: "%.1f", Formatters.units.mass(fromKilograms: snapshot.bodyMass))
+                ? String(format: "%.1f", Formatters.mass(fromKilograms: snapshot.bodyMass))
                 : "--",
-            unit: Formatters.units.massUnit,
+            unit: Formatters.massUnit,
             suffix: nil,
             series: snapshot.bodyMassTrend,
             insight: driftInsight(
-                series: snapshot.bodyMassTrend.map { Formatters.units.mass(fromKilograms: $0) },
-                unit: Formatters.units.massUnit,
+                series: snapshot.bodyMassTrend.map { Formatters.mass(fromKilograms: $0) },
+                unit: Formatters.massUnit,
                 positiveIsGood: false
             )
         )
@@ -602,11 +602,11 @@ nonisolated enum MetricReadings {
         guard metres > 0 else { return "No vertical gain recorded in the last seven days." }
         let units = Formatters.units
         guard distanceKm > 0.5 else {
-            return "\(Formatters.elevation(metres)) \(units.elevationUnit) of climbing this week."
+            return "\(Formatters.elevation(metres)) \(Formatters.elevationUnit) of climbing this week."
         }
         let perKm = metres / distanceKm
         let character = perKm > 40 ? "genuinely mountainous" : perKm > 20 ? "rolling" : "mostly flat"
-        let shown = units == .metric ? perKm : units.elevation(fromMetres: metres) / units.distance(fromMetres: distanceKm * 1000)
+        let shown = Formatters.elevationSystem.elevation(fromMetres: metres) / units.distance(fromMetres: distanceKm * 1000)
         return String(format: "%.0f %@ — a %@ week.", shown, units.perDistanceUnit, character)
     }
 

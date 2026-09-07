@@ -1,6 +1,7 @@
 import Foundation
 
-/// A completed workout, either recorded in-app or read from HealthKit.
+/// A completed workout, either recorded in-app, logged on the watch, read from
+/// HealthKit, or entered by hand in the gym.
 nonisolated struct ActivityRecord: Codable, Identifiable, Hashable, Sendable {
     var id: UUID = UUID()
     var name: String
@@ -14,18 +15,91 @@ nonisolated struct ActivityRecord: Codable, Identifiable, Hashable, Sendable {
     var trainingEffect: Double
     var track: [RoutePoint] = []
     var zoneMinutes: [Double] = [0, 0, 0, 0, 0]
+    /// Sets for strength sessions, weight always in kilograms. Empty for every
+    /// other kind of workout.
+    var strengthSets: [StrengthSet] = []
 
     var averagePace: TimeInterval {
         guard distance > 100 else { return 0 }
         return duration / (distance / 1000)
     }
+
+    /// A session with sets logged is a gym session, whatever label it carries.
+    var isStrengthSession: Bool {
+        !strengthSets.isEmpty || activity == .strength
+    }
+
+    init(
+        id: UUID = UUID(),
+        name: String,
+        activity: RouteActivityType,
+        startDate: Date,
+        duration: TimeInterval,
+        distance: Double,
+        elevationGain: Double,
+        averageHeartRate: Double,
+        calories: Double,
+        trainingEffect: Double,
+        track: [RoutePoint] = [],
+        zoneMinutes: [Double] = [0, 0, 0, 0, 0],
+        strengthSets: [StrengthSet] = []
+    ) {
+        self.id = id
+        self.name = name
+        self.activity = activity
+        self.startDate = startDate
+        self.duration = duration
+        self.distance = distance
+        self.elevationGain = elevationGain
+        self.averageHeartRate = averageHeartRate
+        self.calories = calories
+        self.trainingEffect = trainingEffect
+        self.track = track
+        self.zoneMinutes = zoneMinutes
+        self.strengthSets = strengthSets
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        activity = try container.decode(RouteActivityType.self, forKey: .activity)
+        startDate = try container.decode(Date.self, forKey: .startDate)
+        duration = try container.decode(TimeInterval.self, forKey: .duration)
+        distance = try container.decode(Double.self, forKey: .distance)
+        elevationGain = try container.decode(Double.self, forKey: .elevationGain)
+        averageHeartRate = try container.decode(Double.self, forKey: .averageHeartRate)
+        calories = try container.decode(Double.self, forKey: .calories)
+        trainingEffect = try container.decode(Double.self, forKey: .trainingEffect)
+        // Decoded tolerantly so records written before a field existed still load.
+        track = try container.decodeIfPresent([RoutePoint].self, forKey: .track) ?? []
+        zoneMinutes = try container.decodeIfPresent([Double].self, forKey: .zoneMinutes) ?? [0, 0, 0, 0, 0]
+        strengthSets = try container.decodeIfPresent([StrengthSet].self, forKey: .strengthSets) ?? []
+    }
 }
 
 nonisolated enum Formatters {
     /// The athlete's chosen units. Set once at launch by `UnitSettings` and
-    /// again whenever they change it, so every call site converts consistently
+    /// again whenever they change one, so every call site converts consistently
     /// without having to thread a preference through the whole view tree.
+    ///
+    /// `units` drives distance, speed and pace; mass and elevation carry their
+    /// own choices, so a lifter can work in kilos while climbing in feet.
+    /// Named with a System suffix to stay clear of the `elevation(_:)` and
+    /// `mass(fromKilograms:)` converters below.
     static var units: UnitSystem = .deviceDefault
+    static var massSystem: UnitSystem = .deviceDefault
+    static var elevationSystem: UnitSystem = .deviceDefault
+
+    /// The weight unit the athlete reads in — kilograms or pounds.
+    static var massUnit: String { massSystem.massUnit }
+    /// The vertical unit the athlete reads in — metres or feet.
+    static var elevationUnit: String { elevationSystem.elevationUnit }
+
+    /// Health and the gym logger store weight in kilograms; imperial prints pounds.
+    static func mass(fromKilograms value: Double) -> Double {
+        massSystem.mass(fromKilograms: value)
+    }
 
     /// A workout or route length, in kilometres or miles.
     static func distance(_ metres: Double) -> String {
@@ -87,10 +161,11 @@ nonisolated enum Formatters {
         return String(format: "%d:%02d", minutes, seconds)
     }
 
-    /// Height or vertical gain, in metres or feet.
+    /// Height or vertical gain, in metres or feet — the athlete's own vertical
+    /// choice, which can differ from the system they read distances in.
     static func elevation(_ metres: Double) -> String {
         guard metres.isFinite else { return "--" }
-        return "\(Int(units.elevation(fromMetres: metres).rounded()))"
+        return "\(Int(elevationSystem.elevation(fromMetres: metres).rounded()))"
     }
 
     static func integer(_ value: Double) -> String {

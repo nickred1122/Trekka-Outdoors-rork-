@@ -122,7 +122,7 @@ struct UpAheadPageView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 if let climb = point.climbTo {
-                    Text("+\(WatchFormat.elevation(climb)) \(WatchFormat.units.elevationUnit)")
+                    Text("+\(WatchFormat.elevation(climb)) \(WatchFormat.elevationUnits.elevationUnit)")
                         .font(.watch(8, weight: .medium))
                         .foregroundStyle(WatchTheme.textSecondary)
                 } else if let arrival = arrival(in: togo) {

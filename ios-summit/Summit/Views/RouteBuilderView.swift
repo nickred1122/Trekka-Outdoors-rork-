@@ -290,7 +290,7 @@ struct RouteBuilderView: View {
             statCell(
                 label: "Climb",
                 value: draft.elevationGain.map { Formatters.elevation($0) } ?? "--",
-                unit: draft.elevationGain == nil ? "" : Formatters.units.elevationUnit,
+                unit: draft.elevationGain == nil ? "" : Formatters.elevationUnit,
                 tint: Theme.highlight
             )
             if draft.snapMode != .direct {
@@ -607,7 +607,7 @@ struct RouteBuilderView: View {
                 .font(.metric(15))
                 .foregroundStyle(Theme.mapControlLabel)
             if let gain = draft.elevationGain {
-                Text("↑\(Formatters.elevation(gain)) \(Formatters.units.elevationUnit)")
+                Text("↑\(Formatters.elevation(gain)) \(Formatters.elevationUnit)")
                     .font(.metric(13, weight: .semibold))
                     .foregroundStyle(Theme.highlight)
             }
@@ -787,7 +787,7 @@ private struct RouteProfileSheet: View {
                                 .foregroundStyle(Theme.textPrimary)
                             Spacer()
                             if let low = draft.minElevation, let high = draft.maxElevation {
-                                Text("\(Formatters.elevation(low)) — \(Formatters.elevation(high)) \(Formatters.units.elevationUnit)")
+                                Text("\(Formatters.elevation(low)) — \(Formatters.elevation(high)) \(Formatters.elevationUnit)")
                                     .font(.system(.caption, weight: .medium))
                                     .monospacedDigit()
                                     .foregroundStyle(Theme.textPrimary.opacity(0.6))

@@ -26,7 +26,8 @@ struct SetLoggerView: View {
     @State private var crown: Double = 8
     @State private var isPickingExercise = false
 
-    private var units: UnitSystem { settings.unitSystem }
+    /// Mass conversion only — the logger dials weights, never distances.
+    private var units: UnitSystem { settings.massSystem }
 
     /// One notch of the dial: a 2.5 kg jump, or 5 lb, which is what the smallest
     /// pair of plates in any gym actually adds.

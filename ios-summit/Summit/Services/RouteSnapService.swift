@@ -50,11 +50,13 @@ nonisolated enum RouteSnapMode: String, CaseIterable, Codable, Sendable, Identif
         }
     }
 
-    /// The mode that suits an activity when the planner opens.
+    /// The mode that suits an activity when the planner opens. Gym sessions
+    /// never plan routes, but the planner still needs a total answer.
     static func `default`(for activity: RouteActivityType) -> RouteSnapMode {
         switch activity {
         case .run, .hike: .foot
         case .ride: .bike
+        case .strength: .direct
         }
     }
 }

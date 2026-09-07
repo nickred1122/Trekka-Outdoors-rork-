@@ -56,7 +56,7 @@ final class LiveActivityService {
             paceUnit: Formatters.units.paceUnit,
             heartRateText: "--",
             ascentText: "0",
-            ascentUnit: Formatters.units.elevationUnit,
+            ascentUnit: Formatters.elevationUnit,
             routeProgress: route == nil ? nil : 0,
             nextWaypointName: route?.waypoints.first?.name,
             distanceToWaypointText: nil
@@ -104,7 +104,7 @@ final class LiveActivityService {
             paceUnit: Formatters.units.paceUnit,
             heartRateText: tracker.heartRate > 0 ? Formatters.integer(tracker.heartRate) : "--",
             ascentText: Formatters.elevation(tracker.elevationGain),
-            ascentUnit: Formatters.units.elevationUnit,
+            ascentUnit: Formatters.elevationUnit,
             routeProgress: tracker.route == nil ? nil : tracker.progressAlongRoute,
             nextWaypointName: waypointName,
             distanceToWaypointText: tracker.nextWaypoint == nil

@@ -142,7 +142,7 @@ struct CalendarView: View {
                 symbol: "arrow.up.forward",
                 label: "Climbed",
                 value: Formatters.elevation(monthActivities.reduce(0) { $0 + $1.elevationGain }),
-                unit: Formatters.units.elevationUnit
+                unit: Formatters.elevationUnit
             ),
         ])
     }

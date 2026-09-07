@@ -68,10 +68,42 @@ struct SettingsView: View {
 
                     divider
 
+                    unitOverrideRow(
+                        symbol: "dumbbell.fill",
+                        title: "Weight",
+                        metricLabel: "kg",
+                        imperialLabel: "lb",
+                        selection: units.massUnits,
+                        onChange: { system in
+                            units.setMass(system)
+                            watchLayout.massSystem = system
+                            watchLayout.pushSilently()
+                            feedback += 1
+                        }
+                    )
+
+                    divider
+
+                    unitOverrideRow(
+                        symbol: "mountain.2.fill",
+                        title: "Elevation",
+                        metricLabel: "m",
+                        imperialLabel: "ft",
+                        selection: units.elevationUnits,
+                        onChange: { system in
+                            units.setElevation(system)
+                            watchLayout.elevationSystem = system
+                            watchLayout.pushSilently()
+                            feedback += 1
+                        }
+                    )
+
+                    divider
+
                     // Say plainly that this is a display choice. Nothing already
                     // recorded changes, and the watch follows the phone, so
                     // neither device can end up quietly quoting the other's unit.
-                    Text("Applies everywhere on the phone and on your watch. Recorded workouts are unchanged — only how they are shown.")
+                    Text("Applies everywhere on the phone and on your watch. Weight and elevation can each follow their own unit. Recorded workouts are unchanged — only how they are shown.")
                         .font(.caption)
                         .foregroundStyle(Theme.textPrimary.opacity(0.45))
                         .fixedSize(horizontal: false, vertical: true)
@@ -297,6 +329,54 @@ struct SettingsView: View {
         .buttonStyle(.plain)
         .accessibilityLabel("\(mode.title) appearance")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    /// One independent unit choice — weight or elevation — as a labelled row of
+    /// two small options, so it reads as its own toggle rather than a second
+    /// unit system hiding behind the metric/imperial cards above it.
+    private func unitOverrideRow(
+        symbol: String,
+        title: String,
+        metricLabel: String,
+        imperialLabel: String,
+        selection: UnitSystem,
+        onChange: @escaping (UnitSystem) -> Void
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+                .frame(width: 30, height: 30)
+                .background(Theme.accent.opacity(0.12), in: .rect(cornerRadius: 9))
+
+            Text(title)
+                .font(.system(.subheadline, weight: .semibold))
+                .foregroundStyle(Theme.textPrimary)
+
+            Spacer(minLength: 8)
+
+            overrideOption(metricLabel, isSelected: selection == .metric) { onChange(.metric) }
+            overrideOption(imperialLabel, isSelected: selection == .imperial) { onChange(.imperial) }
+        }
+        .padding(12)
+    }
+
+    private func overrideOption(
+        _ label: String,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(.subheadline, weight: .bold))
+                .monospacedDigit()
+                .foregroundStyle(isSelected ? Theme.canvas : Theme.textPrimary.opacity(0.55))
+                .frame(width: 46)
+                .padding(.vertical, 8)
+                .background(isSelected ? Theme.accent : Theme.surfaceRaised, in: .rect(cornerRadius: 9))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 
     private func unitOption(_ system: UnitSystem) -> some View {

@@ -55,7 +55,7 @@ struct ActivitiesWatchView: View {
                         WatchStatRow(title: "Time", value: WatchFormat.compactDuration(weekTotals.duration))
                         WatchStatRow(
                             title: "Ascent",
-                            value: "\(WatchFormat.elevation(weekTotals.ascent)) \(WatchFormat.units.elevationUnit)",
+                            value: "\(WatchFormat.elevation(weekTotals.ascent)) \(WatchFormat.elevationUnits.elevationUnit)",
                             tint: WatchTheme.highlight
                         )
                     }
@@ -132,7 +132,7 @@ struct ActivityDetailWatchView: View {
                     WatchStatRow(title: "Time", value: WatchFormat.duration(activity.duration))
                     WatchStatRow(
                         title: "Ascent",
-                        value: "\(WatchFormat.elevation(activity.elevationGain)) \(WatchFormat.units.elevationUnit)",
+                        value: "\(WatchFormat.elevation(activity.elevationGain)) \(WatchFormat.elevationUnits.elevationUnit)",
                         tint: WatchTheme.highlight
                     )
                     WatchStatRow(title: "Avg pace", value: WatchFormat.pace(activity.averagePace))

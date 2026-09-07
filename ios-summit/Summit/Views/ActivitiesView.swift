@@ -12,6 +12,7 @@ struct ActivitiesView: View {
     @Binding var path: NavigationPath
 
     @State private var filter: RouteActivityType?
+    @State private var showsLogger = false
 
     private var activities: [ActivityRecord] {
         let sorted = ActivityFeed.merged(store: store, health: health)
@@ -35,7 +36,7 @@ struct ActivitiesView: View {
                 StatStrip(items: [
                     StatItem(symbol: "arrow.left.and.right", label: "7-day dist.", value: Formatters.distance(weekTotals.distance), unit: Formatters.units.distanceUnit),
                     StatItem(symbol: "clock", label: "Moving", value: Formatters.compactDuration(weekTotals.duration), unit: ""),
-                    StatItem(symbol: "arrow.up.forward", label: "Climbed", value: Formatters.elevation(weekTotals.gain), unit: Formatters.units.elevationUnit),
+                    StatItem(symbol: "arrow.up.forward", label: "Climbed", value: Formatters.elevation(weekTotals.gain), unit: Formatters.elevationUnit),
                 ])
 
                 recordsLink
@@ -73,6 +74,22 @@ struct ActivitiesView: View {
         }
         .scrollIndicators(.hidden)
         .background(Theme.canvas)
+        .toolbar {
+            // Gym logging lives here because this is the list it lands in — a
+            // session logged on the phone joins the ones the watch sent.
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showsLogger = true
+                } label: {
+                    Image(systemName: "dumbbell.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                }
+                .accessibilityLabel("Log a strength session")
+            }
+        }
+        .sheet(isPresented: $showsLogger) {
+            LogStrengthView()
+        }
     }
 
     /// A standing count of bests, so the record book is never buried.
@@ -163,10 +180,17 @@ struct ActivityRow: View {
             }
 
             HStack(spacing: 0) {
-                metric(value: Formatters.distance(activity.distance), unit: Formatters.units.distanceUnit, label: "Distance")
-                metric(value: Formatters.duration(activity.duration), unit: "", label: "Time")
-                metric(value: Formatters.pace(activity.averagePace), unit: Formatters.units.paceUnit, label: "Pace")
-                metric(value: Formatters.elevation(activity.elevationGain), unit: Formatters.units.elevationUnit, label: "Climb")
+                if activity.isStrengthSession {
+                    metric(value: "\(activity.strengthSets.count)", unit: "", label: "Sets")
+                    metric(value: "\(activity.strengthSets.reduce(0) { $0 + $1.reps })", unit: "", label: "Reps")
+                    metric(value: Formatters.integer(activity.strengthSets.reduce(0) { $0 + $1.volume }), unit: Formatters.massUnit, label: "Volume")
+                    metric(value: Formatters.compactDuration(activity.duration), unit: "", label: "Time")
+                } else {
+                    metric(value: Formatters.distance(activity.distance), unit: Formatters.units.distanceUnit, label: "Distance")
+                    metric(value: Formatters.duration(activity.duration), unit: "", label: "Time")
+                    metric(value: Formatters.pace(activity.averagePace), unit: Formatters.units.paceUnit, label: "Pace")
+                    metric(value: Formatters.elevation(activity.elevationGain), unit: Formatters.elevationUnit, label: "Climb")
+                }
             }
         }
         .padding(12)

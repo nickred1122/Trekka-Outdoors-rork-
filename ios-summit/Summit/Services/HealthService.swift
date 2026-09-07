@@ -1041,14 +1041,18 @@ nonisolated extension RouteActivityType {
         case .run: .running
         case .ride: .cycling
         case .hike: .hiking
+        case .strength: .traditionalStrengthTraining
         }
     }
 
-    /// The distance type Health records this activity against.
+    /// The distance type Health records this activity against. Gym sessions
+    /// travel no distance, so they fall back to steps rather than a distance
+    /// type that would never be written.
     var distanceIdentifier: HKQuantityTypeIdentifier {
         switch self {
         case .ride: .distanceCycling
         case .run, .hike: .distanceWalkingRunning
+        case .strength: .stepCount
         }
     }
 }

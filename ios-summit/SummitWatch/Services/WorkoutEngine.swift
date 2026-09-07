@@ -747,6 +747,9 @@ final class WorkoutEngine {
         let finishedRouteName = route?.name
         let finishedMetrics = metrics
         let finishedTrack = track
+        // Copied for the same reason as the metrics: resetting the engine once
+        // the summary is dismissed must not reach into what gets sent.
+        let finishedStrength = strength
 
         Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(320))
@@ -756,7 +759,8 @@ final class WorkoutEngine {
                 sport: finishedSport,
                 routeName: finishedRouteName,
                 metrics: finishedMetrics,
-                track: finishedTrack
+                track: finishedTrack,
+                strength: finishedStrength
             )
             publishFaceState()
         }
@@ -813,7 +817,8 @@ final class WorkoutEngine {
         sport: WatchSport,
         routeName: String?,
         metrics: LiveMetrics,
-        track: [WatchTrackPoint]
+        track: [WatchTrackPoint],
+        strength: StrengthSession
     ) {
         guard metrics.elapsed > 30 else { return }
         let identifier = UUID()
@@ -835,6 +840,15 @@ final class WorkoutEngine {
                     latitude: point.latitude,
                     longitude: point.longitude,
                     elevation: point.altitude
+                )
+            },
+            strengthSets: strength.sets.isEmpty ? nil : strength.sets.map { set in
+                WorkoutSummaryTransfer.StrengthSetTransfer(
+                    id: set.id,
+                    exercise: set.exercise,
+                    reps: set.reps,
+                    weightKilograms: set.weightKilograms,
+                    loggedAt: set.loggedAt
                 )
             }
         )

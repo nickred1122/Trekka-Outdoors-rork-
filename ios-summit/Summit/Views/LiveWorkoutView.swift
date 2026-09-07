@@ -386,12 +386,12 @@ struct LiveWorkoutView: View {
     private var elevationStrip: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text("\(Formatters.elevation(tracker.currentElevation)) \(Formatters.units.elevationUnit) now")
+                Text("\(Formatters.elevation(tracker.currentElevation)) \(Formatters.elevationUnit) now")
                     .font(.system(.footnote, weight: .semibold))
                     .monospacedDigit()
                     .foregroundStyle(Theme.textPrimary)
                 Spacer()
-                Text("\(Formatters.elevation(tracker.elevationGain)) \(Formatters.units.elevationUnit) ↑ climbed")
+                Text("\(Formatters.elevation(tracker.elevationGain)) \(Formatters.elevationUnit) ↑ climbed")
                     .font(.caption)
                     .monospacedDigit()
                     .foregroundStyle(Theme.textPrimary.opacity(0.55))
@@ -491,7 +491,7 @@ private struct MetricsSheet: View {
                     StatStrip(items: [
                         StatItem(symbol: "clock", label: "Elapsed", value: tracker.elapsedText, unit: ""),
                         StatItem(symbol: "arrow.left.and.right", label: "Distance", value: Formatters.distance(tracker.distance), unit: Formatters.units.distanceUnit),
-                        StatItem(symbol: "arrow.up.forward", label: "Climb", value: Formatters.elevation(tracker.elevationGain), unit: Formatters.units.elevationUnit),
+                        StatItem(symbol: "arrow.up.forward", label: "Climb", value: Formatters.elevation(tracker.elevationGain), unit: Formatters.elevationUnit),
                     ])
 
                     if let route = tracker.route {
@@ -589,7 +589,7 @@ private struct WorkoutSummarySheet: View {
                     ])
 
                     StatStrip(items: [
-                        StatItem(symbol: "arrow.up.forward", label: "Climb", value: Formatters.elevation(activity.elevationGain), unit: Formatters.units.elevationUnit),
+                        StatItem(symbol: "arrow.up.forward", label: "Climb", value: Formatters.elevation(activity.elevationGain), unit: Formatters.elevationUnit),
                         StatItem(symbol: "flame.fill", label: "Calories", value: Formatters.integer(activity.calories), unit: "kcal"),
                         StatItem(symbol: "bolt.heart", label: "Effect", value: String(format: "%.1f", activity.trainingEffect), unit: ""),
                     ])
