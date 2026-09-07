@@ -242,6 +242,12 @@ private actor HealthStore {
         .dateOfBirth, .biologicalSex,
     ]
 
+    /// Health has no model for sets and reps, so a gym session's totals ride
+    /// along as metadata under Trekka's own keys. The per-set detail stays in
+    /// Trekka; this is what an export or another app can still read.
+    private static let strengthSetCountKey = "TrekkaStrengthSetCount"
+    private static let strengthVolumeKey = "TrekkaStrengthVolume"
+
     func requestAuthorization() async -> Bool {
         do {
             try await store.requestAuthorization(toShare: shareTypes, read: readTypes)
@@ -270,9 +276,12 @@ private actor HealthStore {
     /// Writes a recorded session as a real `HKWorkout`, with its energy,
     /// distance and GPS route attached.
     func save(_ activity: ActivityRecord) async throws {
+        let isStrength = activity.isStrengthSession
         let configuration = HKWorkoutConfiguration()
         configuration.activityType = activity.activity.healthKitActivity
-        configuration.locationType = .outdoor
+        // A gym session covers no ground; everything else Trekka records is an
+        // outdoor session with a track behind it.
+        configuration.locationType = isStrength ? .indoor : .outdoor
 
         let start = activity.startDate
         let end = start.addingTimeInterval(max(1, activity.duration))
@@ -291,7 +300,7 @@ private actor HealthStore {
                 )
             )
         }
-        if activity.distance > 0,
+        if !isStrength, activity.distance > 0,
            let type = HKQuantityType.quantityType(forIdentifier: activity.activity.distanceIdentifier) {
             samples.append(
                 HKQuantitySample(
@@ -319,10 +328,20 @@ private actor HealthStore {
             try await builder.addSamples(samples)
         }
 
+        var metadata: [String: Any] = [:]
         if activity.elevationGain > 0 {
-            try await builder.addMetadata([
-                HKMetadataKeyElevationAscended: HKQuantity(unit: .meter(), doubleValue: activity.elevationGain)
-            ])
+            metadata[HKMetadataKeyElevationAscended] = HKQuantity(unit: .meter(), doubleValue: activity.elevationGain)
+        }
+        if isStrength {
+            metadata[HKMetadataKeyIndoorWorkout] = NSNumber(value: true)
+            if !activity.strengthSets.isEmpty {
+                let volume = activity.strengthSets.reduce(0) { $0 + $1.volume }
+                metadata[Self.strengthSetCountKey] = NSNumber(value: activity.strengthSets.count)
+                metadata[Self.strengthVolumeKey] = HKQuantity(unit: .gramUnit(with: .kilo), doubleValue: volume)
+            }
+        }
+        if !metadata.isEmpty {
+            try await builder.addMetadata(metadata)
         }
 
         try await builder.endCollection(at: end)
@@ -982,11 +1001,16 @@ private actor HealthStore {
             let type: RouteActivityType = switch workout.workoutActivityType {
             case .cycling: .ride
             case .hiking, .walking: .hike
+            case .traditionalStrengthTraining, .functionalStrengthTraining, .coreTraining: .strength
             default: .run
             }
-            let distance = workout.statistics(for: HKQuantityType(type.distanceIdentifier))?
-                .sumQuantity()?
-                .doubleValue(for: .meter()) ?? 0
+            // Strength workouts travel nowhere, and their distance identifier is
+            // a stand-in — reading it would report step count as distance.
+            let distance = type == .strength ? 0 : (
+                workout.statistics(for: HKQuantityType(type.distanceIdentifier))?
+                    .sumQuantity()?
+                    .doubleValue(for: .meter()) ?? 0
+            )
             let calories = workout.statistics(for: HKQuantityType(.activeEnergyBurned))?
                 .sumQuantity()?
                 .doubleValue(for: .kilocalorie()) ?? 0

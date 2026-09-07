@@ -40,9 +40,22 @@ struct ActivityDetailView: View {
     /// progress. None of the trail machinery — splits, pace, maps — applies.
     @ViewBuilder
     private var strengthContent: some View {
+        // A gym session brought in from Health carries no per-set detail — Health
+        // does not model sets and reps — so those figures say so rather than
+        // reporting a zero that reads like nothing was lifted.
         StatStrip(items: [
-            StatItem(symbol: "dumbbell.fill", label: "Volume", value: Formatters.integer(strengthVolume), unit: Formatters.massUnit),
-            StatItem(symbol: "number", label: "Sets", value: "\(activity.strengthSets.count)", unit: ""),
+            StatItem(
+                symbol: "dumbbell.fill",
+                label: "Volume",
+                value: activity.strengthSets.isEmpty ? "--" : Formatters.integer(strengthVolume),
+                unit: Formatters.massUnit
+            ),
+            StatItem(
+                symbol: "number",
+                label: "Sets",
+                value: activity.strengthSets.isEmpty ? "--" : "\(activity.strengthSets.count)",
+                unit: ""
+            ),
             StatItem(symbol: "clock", label: "Time", value: Formatters.duration(activity.duration), unit: ""),
         ])
 

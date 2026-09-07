@@ -8,6 +8,7 @@ import SwiftUI
 struct LogStrengthView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(RouteStore.self) private var store
+    @Environment(HealthService.self) private var health
 
     @State private var startedAt: Date = .now
     @State private var sets: [StrengthSet] = []
@@ -284,6 +285,10 @@ struct LogStrengthView: View {
             strengthSets: sets
         )
         store.add(record)
+        // Written to Apple Health as a strength workout, the same as a session
+        // recorded live. Watch sessions are already there via the wrist's own
+        // workout session, so only phone-logged ones are written from here.
+        Task { await health.save(record) }
         dismiss()
     }
 }
