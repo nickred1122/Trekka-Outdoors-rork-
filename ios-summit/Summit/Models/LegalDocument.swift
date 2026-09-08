@@ -48,7 +48,7 @@ nonisolated struct LegalDocument: Identifiable, Hashable, Sendable {
 nonisolated enum LegalAgreements {
     static let appName = "Trekka"
     static let provider = "Trekka"
-    static let contactEmail = "support@trekka.app"
+    static let contactEmail = "Trekkaoutdoors.app@outlook.com"
     static let effectiveDate = "8 September 2026"
 
     /// True once every current document has been accepted.
