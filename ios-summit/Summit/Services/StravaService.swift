@@ -139,8 +139,18 @@ final class StravaService {
 
     private static let autoUploadKey = "strava.autoUpload.v1"
     private static let sentKey = "strava.sentActivities.v1"
+    /// Sign-in comes back to Trekka through a scheme of our own rather than a web
+    /// address, so nothing has to be hosted for it and no server ever sees the
+    /// code. `ASWebAuthenticationSession` catches the callback itself, which is
+    /// why the scheme needs no entry in the app's registered URL types.
+    ///
+    /// Strava checks the redirect against the "Authorization Callback Domain" on
+    /// the API settings page, comparing it to the *host* part of this URI — so
+    /// that field has to read `localhost`, not a domain Trekka owns. Changing one
+    /// of these two without the other breaks sign-in with an `invalid` error from
+    /// Strava before their page even loads.
     private static let callbackScheme = "trekka"
-    private static let redirectURI = "trekka://strava"
+    private static let redirectURI = "trekka://localhost/strava"
 
     private(set) var connection: Connection = .signedOut
     /// The workout currently being sent, so its row can show a spinner.
@@ -243,7 +253,10 @@ final class StravaService {
     }
 
     private func authorizationCode() async throws -> String {
-        var components = URLComponents(string: "https://www.strava.com/oauth/mobile/authorize")
+        // The plain authorize endpoint, not `/oauth/mobile/authorize`: the mobile
+        // one exists to hand off to an installed Strava app, which a web
+        // authentication session cannot do.
+        var components = URLComponents(string: "https://www.strava.com/oauth/authorize")
         components?.queryItems = [
             URLQueryItem(name: "client_id", value: Self.clientID),
             URLQueryItem(name: "redirect_uri", value: Self.redirectURI),
