@@ -47,7 +47,9 @@ struct ExpandedMapWatchView: View {
     private static let minimumExponent: Double = log2(minimumSpanMetres)
     private static let maximumExponent: Double = log2(maximumSpanMetres)
     private static let defaultExponent: Double = log2(1_200)
-    private static let exponentStep: Double = 0.25
+    /// Fine enough that the ground slides rather than jumping a scale at a time.
+    /// Sensitivity, set to high below, is what gives a flick useful range.
+    private static let exponentStep: Double = 0.02
     private static let buttonStep: Double = 0.5
 
     private var zoomMetres: Double { pow(2, zoomExponent) }
@@ -69,7 +71,8 @@ struct ExpandedMapWatchView: View {
                     by: Self.exponentStep,
                     sensitivity: .high,
                     isContinuous: false,
-                    isHapticFeedbackEnabled: true
+                    // A detent click on a step this fine is a continuous buzz.
+                    isHapticFeedbackEnabled: false
                 )
 
             Color.clear

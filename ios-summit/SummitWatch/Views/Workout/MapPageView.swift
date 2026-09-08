@@ -69,10 +69,16 @@ struct MapPageView: View {
     private static let minimumExponent: Double = log2(minimumSpanMetres)
     private static let maximumExponent: Double = log2(maximumSpanMetres)
     private static let defaultExponent: Double = log2(900)
-    /// About 19% of ground per detent. Any finer and a normal flick of the
-    /// Crown moves the scale by an amount too small to notice, which reads on
-    /// the wrist as the Crown being dead even when it is working perfectly.
-    private static let exponentStep: Double = 0.25
+    /// Fine enough to read as continuous rather than as steps.
+    ///
+    /// This was 0.25 — about 19% of the ground per detent — on the theory that
+    /// big steps make the zoom obviously alive. They do the opposite: a fifth of
+    /// the scale per click is a jump, so the map lurched between scales and the
+    /// ground never travelled under the finger. Sensitivity, not step size, is
+    /// what decides whether a flick of the Crown covers useful range, and that
+    /// is set to high below. So the step goes as fine as is worth drawing and
+    /// the zoom becomes a slide instead of a staircase.
+    private static let exponentStep: Double = 0.02
     /// One tap of the on-screen zoom: about 40% of ground, so the whole range is
     /// a dozen or so taps rather than fifty.
     private static let buttonStep: Double = 0.5
@@ -159,7 +165,10 @@ struct MapPageView: View {
                     // even when it was listening.
                     sensitivity: .high,
                     isContinuous: false,
-                    isHapticFeedbackEnabled: true
+                    // Detent haptics on a step this fine would be a continuous
+                    // buzz, and the click was also the thing that made the old
+                    // coarse steps feel like a ratchet rather than a zoom.
+                    isHapticFeedbackEnabled: false
                 )
 
             // Chips and buttons keep to the safe area, where the curved corners

@@ -136,7 +136,7 @@ struct LabelScannerView: View {
             if reading.basis == .perServing && reading.servingGrams == nil && reading.isUsable {
                 warning("Found the values but not the serving size — you'll be asked for it on the next screen.")
             } else if reading.energyAgreesWithMacros == false {
-                warning("The energy and the macros don't quite add up. Check them on the next screen.")
+                warning("The calories and the macros don't quite add up. Check them on the next screen.")
             }
 
             Button {

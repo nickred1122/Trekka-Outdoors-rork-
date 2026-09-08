@@ -28,7 +28,9 @@ nonisolated enum LabelField: String, CaseIterable, Sendable, Identifiable {
 
     var title: String {
         switch self {
-        case .energy: "Energy"
+        // "Energy" is what European panels print, but it is not what anyone
+        // counting them calls the number. The app says calories throughout.
+        case .energy: "Calories"
         case .protein: "Protein"
         case .carbohydrate: "Carbs"
         case .fat: "Fat"

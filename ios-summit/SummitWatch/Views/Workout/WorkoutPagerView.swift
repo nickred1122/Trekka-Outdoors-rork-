@@ -529,8 +529,7 @@ struct WorkoutPagerView: View {
             gpsBars: engine.gpsBars,
             isGPSLive: engine.isGPSLive,
             batteryPercent: engine.batteryPercent,
-            isPowerSaving: engine.isPowerSaving,
-            showsBadges: settings.showsStatusBadges
+            isPowerSaving: engine.isPowerSaving
         )
         // Lifted into the clock's own row. The strip keeps to the left and the
         // watch's clock keeps to the right, so the two share one line rather

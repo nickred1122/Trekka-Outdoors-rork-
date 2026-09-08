@@ -126,7 +126,7 @@ struct CustomFoodView: View {
 
     private var macrosCard: some View {
         VStack(spacing: 0) {
-            numberField("Energy", text: $energyText, unit: "kcal", field: .energy)
+            numberField("Calories", text: $energyText, unit: "kcal", field: .energy)
             Divider().overlay(Theme.border).padding(.leading, 14)
             numberField("Protein", text: $proteinText, unit: "g", field: .protein)
             Divider().overlay(Theme.border).padding(.leading, 14)
@@ -169,7 +169,7 @@ struct CustomFoodView: View {
             return "The panel gave its values per serving but didn't say what a serving weighs. Enter it above, then check the rest."
         }
         if prefill.energyAgreesWithMacros == false {
-            return "Check these against the packet — the energy and the macros don't quite add up, so something may have been misread."
+            return "Check these against the packet — the calories and the macros don't quite add up, so something may have been misread."
         }
         return "Check these against the packet before saving. Anything the label didn't print has been left blank."
     }

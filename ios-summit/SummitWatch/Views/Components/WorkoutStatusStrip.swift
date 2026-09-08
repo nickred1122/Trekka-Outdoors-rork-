@@ -121,8 +121,11 @@ struct WorkoutStatusStrip: View {
     let isGPSLive: Bool
     let batteryPercent: Int
     let isPowerSaving: Bool
-    /// Whether signal and charge ride above the page.
-    var showsBadges: Bool = true
+    // Signal and charge used to ride up here behind a toggle. They are ordinary
+    // data fields now, and a readout living in two places at once is one the
+    // athlete has to reconcile mid-effort. What is left in this strip is only
+    // *states* — paused, auto-paused, power saver — which cannot be fields
+    // because they are not measurements of anything.
 
     /// Paused is the one state worth interrupting the page for: a workout that
     /// has quietly stopped recording looks exactly like one that has not.
@@ -135,7 +138,7 @@ struct WorkoutStatusStrip: View {
     /// Nothing to report means no strip at all, rather than an empty band of
     /// gradient sitting over the top of the map.
     private var hasContent: Bool {
-        haltedText != nil || showsBadges || isPowerSaving
+        haltedText != nil || isPowerSaving
     }
 
     var body: some View {
@@ -157,14 +160,9 @@ struct WorkoutStatusStrip: View {
                     .minimumScaleFactor(0.75)
             }
 
-            if showsBadges {
-                if usesGPS {
-                    GPSStrengthBadge(bars: gpsBars, isLive: isGPSLive)
-                }
-                BatteryReadout(percent: batteryPercent, isPowerSaving: isPowerSaving)
-            } else if isPowerSaving {
-                // Power saver changes what the sensors are doing, so it stays
-                // visible even when the badges are off.
+            if isPowerSaving {
+                // Power saver changes what the sensors are doing behind the
+                // athlete's back, so it is a state worth a mark of its own.
                 Image(systemName: "leaf.fill")
                     .font(.watch(8, weight: .bold))
                     .foregroundStyle(WatchTheme.positive)

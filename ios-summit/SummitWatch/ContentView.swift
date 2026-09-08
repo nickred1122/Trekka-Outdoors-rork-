@@ -323,19 +323,6 @@ struct WatchSettingsView: View {
             }
 
             Section {
-                Toggle(isOn: Binding(
-                    get: { settings.showsStatusBadges },
-                    set: { settings.showsStatusBadges = $0 }
-                )) {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("GPS & battery overlay").font(.system(size: 12))
-                        Text(settings.showsStatusBadges ? "Above every page" : "Use data fields instead")
-                            .font(.system(size: 9))
-                            .foregroundStyle(WatchTheme.textSecondary)
-                    }
-                }
-                .tint(WatchTheme.accent)
-
                 NavigationLink {
                     TrailColorsWatchView()
                 } label: {
