@@ -9,6 +9,10 @@ nonisolated struct WorkoutSummaryTransfer: Codable, Sendable {
         var latitude: Double
         var longitude: Double
         var elevation: Double
+        /// When the fix was taken. Optional so summaries sent by earlier watch
+        /// builds still decode — those tracks simply carry no clock, and anything
+        /// that needs one has to say so rather than invent it.
+        var time: Date?
     }
 
     var id: UUID

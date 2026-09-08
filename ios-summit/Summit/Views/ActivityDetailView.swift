@@ -5,6 +5,7 @@ struct ActivityDetailView: View {
 
     @Environment(RouteStore.self) private var store
     @Environment(HealthService.self) private var health
+    @Environment(StravaService.self) private var strava
 
     @State private var recenterToken = 0
 
@@ -46,6 +47,33 @@ struct ActivityDetailView: View {
         .navigationTitle(activity.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
+        .toolbar { stravaButton }
+    }
+
+    /// Sending this one workout to Strava, offered only once the athlete has
+    /// connected an account — a button that exists to explain a feature they have
+    /// not set up belongs in Settings, not on top of their workout.
+    @ToolbarContentBuilder
+    private var stravaButton: some ToolbarContent {
+        if strava.isConnected {
+            ToolbarItem(placement: .topBarTrailing) {
+                if strava.sendingActivityID == activity.id {
+                    ProgressView().tint(Theme.accent)
+                } else if strava.hasSent(activity.id) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Theme.positive)
+                        .accessibilityLabel("Already sent to Strava")
+                } else {
+                    Button {
+                        Task { await strava.send(activity) }
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .disabled(strava.sendingActivityID != nil)
+                    .accessibilityLabel("Send to Strava")
+                }
+            }
+        }
     }
 
     /// A gym session: what was lifted, in sets, with the totals that track

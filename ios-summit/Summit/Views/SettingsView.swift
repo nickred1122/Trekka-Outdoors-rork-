@@ -6,6 +6,7 @@ nonisolated enum SettingsDestination: Hashable, Sendable {
     case goals
     case eventLog
     case tabBar
+    case strava
 }
 
 /// Everything that configures Trekka, gathered in one place instead of hiding
@@ -22,6 +23,7 @@ struct SettingsView: View {
     @Environment(GoalSettings.self) private var goals
     @Environment(ConsentSettings.self) private var consent
     @Environment(TabBarSettings.self) private var tabBar
+    @Environment(StravaService.self) private var strava
     @Binding var path: NavigationPath
 
     @State private var showsHealthSheet = false
@@ -164,6 +166,17 @@ struct SettingsView: View {
                     }
                 }
 
+                section("Connections") {
+                    row(
+                        symbol: "figure.run.circle.fill",
+                        title: "Strava",
+                        detail: stravaDetail,
+                        tint: strava.isConnected ? Theme.positive : Theme.accent
+                    ) {
+                        path.append(SettingsDestination.strava)
+                    }
+                }
+
                 section("Your data") {
                     row(
                         symbol: "icloud",
@@ -233,6 +246,16 @@ struct SettingsView: View {
     private func commitName() {
         profile.setName(draftName)
         draftName = profile.name
+    }
+
+    private var stravaDetail: String {
+        switch strava.connection {
+        case .notConfigured: "Not available in this build"
+        case .signedOut, .connecting: "Sign in to export your workouts"
+        case .failed: "Sign-in did not complete — tap to try again"
+        case let .connected(athlete):
+            "\(athlete ?? "Connected") · \(strava.isAutoUploadEnabled ? "sending automatically" : "sending by hand")"
+        }
     }
 
     private var eventLogDetail: String {

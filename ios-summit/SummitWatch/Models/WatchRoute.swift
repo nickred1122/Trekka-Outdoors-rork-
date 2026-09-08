@@ -110,6 +110,102 @@ nonisolated enum WatchRouteMath {
         return end.distance(from: start)
     }
 
+    /// Where the athlete stands in relation to the route line.
+    ///
+    /// Measured against the line itself rather than against the nearest recorded
+    /// point. Routes are simplified before they are sent to the watch, so their
+    /// points can be eighty metres apart on a straight section; somebody walking
+    /// exactly down the middle of the course is then forty metres from every one
+    /// of them, which was enough to raise an off-course alarm on a path they had
+    /// never left. Projecting onto the segment gives the distance a walker would
+    /// recognise: how far sideways they are from the path.
+    nonisolated struct RoutePosition: Sendable, Equatable {
+        /// The route point at or before the athlete.
+        var index: Int
+        /// Metres from the start of the route, interpolated inside the segment.
+        var travelled: Double
+        /// Metres sideways from the line.
+        var offLine: Double
+    }
+
+    /// Projects a coordinate onto the segment a-b.
+    ///
+    /// Flat-earth arithmetic in metres relative to `a`: over a segment of a few
+    /// hundred metres the curvature error is far below the accuracy of the fix
+    /// being projected, and this runs across the whole route once a second.
+    private static func project(
+        _ coordinate: CLLocationCoordinate2D,
+        onto a: WatchRoutePoint,
+        _ b: WatchRoutePoint
+    ) -> (fraction: Double, distance: Double) {
+        let latitudeScale = 111_320.0
+        let longitudeScale = 111_320.0 * max(0.05, cos(a.latitude * .pi / 180))
+
+        let bx = (b.longitude - a.longitude) * longitudeScale
+        let by = (b.latitude - a.latitude) * latitudeScale
+        let px = (coordinate.longitude - a.longitude) * longitudeScale
+        let py = (coordinate.latitude - a.latitude) * latitudeScale
+
+        let lengthSquared = bx * bx + by * by
+        guard lengthSquared > 0.01 else {
+            return (0, (px * px + py * py).squareRoot())
+        }
+        let fraction = min(1, max(0, (px * bx + py * by) / lengthSquared))
+        let dx = px - bx * fraction
+        let dy = py - by * fraction
+        return (fraction, (dx * dx + dy * dy).squareRoot())
+    }
+
+    /// Finds the athlete's position along the route, preferring the stretch they
+    /// were on a moment ago.
+    ///
+    /// `hint` is the segment matched on the previous fix. Without it, an
+    /// out-and-back or a figure-of-eight matches whichever leg happens to be a
+    /// metre closer, so distance remaining lurches by the length of the route
+    /// each time the two legs cross. Searching the neighbourhood first makes
+    /// progress move the way the athlete does; the global search still runs when
+    /// the local answer is poor, which is what recovers a genuine short-cut, a
+    /// restart part-way round, or a route joined at the far end.
+    static func position(
+        of coordinate: CLLocationCoordinate2D,
+        in points: [WatchRoutePoint],
+        distances: [Double],
+        near hint: Int? = nil,
+        window: Int = 80,
+        corridor: Double = 60
+    ) -> RoutePosition {
+        guard points.count > 1 else {
+            let offLine = points.first.map { metres(from: coordinate, to: $0) } ?? .infinity
+            return RoutePosition(index: 0, travelled: 0, offLine: offLine)
+        }
+
+        let segments = 0..<(points.count - 1)
+
+        func best(in range: Range<Int>) -> RoutePosition? {
+            var bestDistance = Double.infinity
+            var result: RoutePosition?
+            for index in range.clamped(to: segments) {
+                let projection = project(coordinate, onto: points[index], points[index + 1])
+                guard projection.distance < bestDistance else { continue }
+                bestDistance = projection.distance
+                let start = distances.indices.contains(index) ? distances[index] : 0
+                let end = distances.indices.contains(index + 1) ? distances[index + 1] : start
+                result = RoutePosition(
+                    index: index,
+                    travelled: start + (end - start) * projection.fraction,
+                    offLine: projection.distance
+                )
+            }
+            return result
+        }
+
+        if let hint, let local = best(in: (hint - window)..<(hint + window + 1)), local.offLine <= corridor {
+            return local
+        }
+
+        return best(in: segments) ?? RoutePosition(index: 0, travelled: 0, offLine: .infinity)
+    }
+
     /// Index of the route point closest to a coordinate, plus that distance.
     static func nearestIndex(to coordinate: CLLocationCoordinate2D, in points: [WatchRoutePoint]) -> (index: Int, distance: Double) {
         guard !points.isEmpty else { return (0, .infinity) }

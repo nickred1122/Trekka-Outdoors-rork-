@@ -17,6 +17,8 @@ struct ContentView: View {
     @State private var profile = ProfileSettings()
     @State private var onboarding = OnboardingState()
     @State private var consent = ConsentSettings()
+    @State private var strava = StravaService()
+    @State private var chat = TrekkaChatService()
     @State private var cloudBackup = CloudBackupService()
     @State private var autoBackup = AutoBackupSettings()
     @State private var watchLink = WatchLink.shared
@@ -32,6 +34,7 @@ struct ContentView: View {
 
     @State private var showsWorkout = false
     @State private var pendingWorkoutRoute: PlannedRoute?
+    @State private var showsChat = false
 
     /// The bar stays put on every root screen and steps aside for pushed detail.
     private var showsTabBar: Bool {
@@ -69,6 +72,11 @@ struct ContentView: View {
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
+
+            if showsAssistantBubble {
+                assistantBubble
+                    .transition(.scale.combined(with: .opacity))
+            }
         }
         // Units are converted deep inside child views and model helpers, so no
         // single value can be observed to catch a change. Rebuilding the screens
@@ -94,6 +102,8 @@ struct ContentView: View {
         .environment(goalSettings)
         .environment(profile)
         .environment(consent)
+        .environment(strava)
+        .environment(chat)
         .environment(\.unitSystem, units.system)
         .preferredColorScheme(appearance.colorScheme)
         .fullScreenCover(item: .constant(launchGate)) { gate in
@@ -112,6 +122,16 @@ struct ContentView: View {
                 ConsentGateView {}
                     .environment(consent)
             }
+        }
+        .sheet(isPresented: $showsChat) {
+            TrekkaChatView()
+                .environment(chat)
+                .environment(store)
+                .environment(health)
+                .environment(nutrition)
+                .environment(goalSettings)
+                .environment(profile)
+                .environment(\.unitSystem, units.system)
         }
         .fullScreenCover(isPresented: $showsWorkout) {
             LiveWorkoutView(initialRoute: pendingWorkoutRoute)
@@ -134,6 +154,10 @@ struct ContentView: View {
             )
 
             watchLink.activate()
+
+            // Asked once at launch so the bubble can decide whether to appear at
+            // all. Checking availability costs nothing and requests nothing.
+            chat.refreshAvailability()
 
             // A goal is part of the dashboard, so the wrist hears about it the
             // moment it changes rather than at the next launch. A sleep goal
@@ -216,6 +240,7 @@ struct ContentView: View {
         }
         .onChange(of: store.activities.count) { _, _ in
             pushDashboard()
+            sendNewestToStravaIfWanted()
         }
         // Switching off the screen you are standing on would otherwise leave the
         // app showing a tab with nothing in the bar selected.
@@ -223,6 +248,48 @@ struct ContentView: View {
             guard !visible.contains(selectedTab), let first = visible.first else { return }
             withAnimation(.snappy(duration: 0.26)) { selectedTab = first }
         }
+    }
+
+    /// Sends a freshly saved workout to Strava, but only for an athlete who has
+    /// asked for that.
+    ///
+    /// Deliberately limited to the newest workout and to one that has not gone
+    /// across already: turning the switch on should not quietly publish a year of
+    /// back history, and a workout edited later should not be posted twice.
+    private func sendNewestToStravaIfWanted() {
+        guard strava.isConnected, strava.isAutoUploadEnabled else { return }
+        guard let newest = store.activities.max(by: { $0.startDate < $1.startDate }) else { return }
+        guard !strava.hasSent(newest.id) else { return }
+        Task { await strava.send(newest) }
+    }
+
+    /// Whether the assistant's bubble should be on screen.
+    ///
+    /// It rides above the tab bar on the root screens only, and stands down over
+    /// pushed detail: a floating button that follows you into a workout summary
+    /// is in the way rather than at hand. It also stays away entirely on a phone
+    /// that cannot run the model, because a button whose only answer is "not on
+    /// this device" is worse than no button.
+    private var showsAssistantBubble: Bool {
+        chat.isEnabled && showsTabBar && chat.availability != .checking && chat.availability.isReady
+    }
+
+    private var assistantBubble: some View {
+        Button {
+            showsChat = true
+        } label: {
+            Image(systemName: "bubble.left.and.sparkles.fill")
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundStyle(Theme.canvas)
+                .frame(width: 52, height: 52)
+                .background(Theme.accent, in: .circle)
+                .shadow(color: .black.opacity(0.28), radius: 10, y: 4)
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .padding(.trailing, 18)
+        .padding(.bottom, TabBarMetrics.scrollInset - 6)
+        .accessibilityLabel("Ask Trekka")
     }
 
     /// What, if anything, stands between launch and the app.
@@ -323,6 +390,8 @@ struct ContentView: View {
                         EventLogView()
                     case .tabBar:
                         TabBarEditorView()
+                    case .strava:
+                        StravaView()
                     }
                 }
         }

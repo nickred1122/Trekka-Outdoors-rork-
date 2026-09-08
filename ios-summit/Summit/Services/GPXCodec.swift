@@ -65,6 +65,37 @@ nonisolated enum GPXCodec {
         return xml
     }
 
+    /// A recorded workout as a GPX track, or nil when its points carry no clock.
+    ///
+    /// Every trackpoint in a GPX activity file needs a time, and Strava reads the
+    /// splits straight out of them. Trekka would rather send no trace at all than
+    /// spread the duration evenly across the points: that would draw a perfectly
+    /// even pace up a climb the athlete walked, and it would be published under
+    /// their name.
+    static func export(activity: ActivityRecord) -> String? {
+        let timed = activity.track.compactMap { point -> (RoutePoint, Date)? in
+            guard let timestamp = point.timestamp else { return nil }
+            return (point, timestamp)
+        }
+        guard timed.count >= 2, timed.count == activity.track.count else { return nil }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+
+        var xml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <gpx version="1.1" creator="Trekka Outdoors" xmlns="http://www.topografix.com/GPX/1/1">
+          <metadata><name>\(escape(activity.name))</name><time>\(formatter.string(from: activity.startDate))</time></metadata>
+          <trk><name>\(escape(activity.name))</name><trkseg>\n
+        """
+        for (point, time) in timed {
+            xml += "    <trkpt lat=\"\(point.latitude)\" lon=\"\(point.longitude)\">"
+            xml += "<ele>\(point.elevation)</ele><time>\(formatter.string(from: time))</time></trkpt>\n"
+        }
+        xml += "  </trkseg></trk>\n</gpx>\n"
+        return xml
+    }
+
     private static func nearestIndex(to point: RoutePoint, in points: [RoutePoint]) -> Int {
         let location = CLLocation(latitude: point.latitude, longitude: point.longitude)
         var bestIndex = 0

@@ -136,6 +136,17 @@ final class WorkoutEngine {
     private var lastFaceRequestAt: Date?
 
     // Navigation alerting state.
+    /// Distance from the route start to each of its points, computed once when
+    /// the course is loaded.
+    ///
+    /// This used to be rebuilt on every fix, which walked the whole route
+    /// building two `CLLocation` objects per point once a second — on a long
+    /// course that is thousands of allocations a minute spent recomputing a
+    /// number that cannot change.
+    private var courseDistances: [Double] = []
+    /// The route segment matched on the previous fix, so progress is looked for
+    /// where the athlete already was rather than anywhere on the course.
+    private var lastCourseIndex: Int?
     private var offCourseSince: Date?
     private var lastOffCourseAlertAt: Date?
     private var lastRerouteAt: Date?
@@ -456,6 +467,8 @@ final class WorkoutEngine {
         metrics.isHeartRateEstimated = false
         metrics.remainingDistance = route?.distance ?? 0
         metrics.nextWaypointName = route?.waypoints.first?.name ?? "—"
+        courseDistances = route.map { WatchRouteMath.cumulativeDistances(of: $0.points) } ?? []
+        lastCourseIndex = nil
         reroute = nil
         navigationBanner = nil
         offCourseSince = nil
@@ -853,7 +866,8 @@ final class WorkoutEngine {
                 WorkoutSummaryTransfer.TrackPoint(
                     latitude: point.latitude,
                     longitude: point.longitude,
-                    elevation: point.altitude
+                    elevation: point.altitude,
+                    time: point.time
                 )
             },
             strengthSets: strength.sets.isEmpty ? nil : strength.sets.map { set in
@@ -1137,7 +1151,8 @@ final class WorkoutEngine {
                 latitude: fix.latitude,
                 longitude: fix.longitude,
                 altitude: fix.altitude,
-                distance: metrics.distance
+                distance: metrics.distance,
+                time: .now
             )
         )
         onLocation?(fix.coordinate, fix.altitude)
@@ -1328,18 +1343,37 @@ final class WorkoutEngine {
     private func updateNavigation() {
         guard let route, let coordinate = currentCoordinate, !route.points.isEmpty else { return }
 
-        let nearest = WatchRouteMath.nearestIndex(to: coordinate, in: route.points)
-        metrics.offCourseMetres = nearest.distance
-        let distances = WatchRouteMath.cumulativeDistances(of: route.points)
-        let covered = distances.indices.contains(nearest.index) ? distances[nearest.index] : 0
+        if courseDistances.count != route.points.count {
+            courseDistances = WatchRouteMath.cumulativeDistances(of: route.points)
+        }
+
+        let position = WatchRouteMath.position(
+            of: coordinate,
+            in: route.points,
+            distances: courseDistances,
+            near: lastCourseIndex
+        )
+        lastCourseIndex = position.index
+
+        let covered = position.travelled
+        metrics.offCourseMetres = position.offLine
         metrics.courseDistance = covered
         metrics.remainingDistance = max(0, route.distance - covered)
-        metrics.remainingAscent = WatchRouteMath.ascentRemaining(from: nearest.index, in: route.points)
-        metrics.remainingDescent = WatchRouteMath.descentRemaining(from: nearest.index, in: route.points)
+        metrics.remainingAscent = WatchRouteMath.ascentRemaining(from: position.index, in: route.points)
+        metrics.remainingDescent = WatchRouteMath.descentRemaining(from: position.index, in: route.points)
         metrics.routeAscent = route.elevationGain
 
-        if metrics.currentSpeed > 0.4 {
-            metrics.etaSeconds = metrics.remainingDistance / metrics.currentSpeed
+        // Time left is quoted from the pace actually being held on this ground,
+        // not from the speed of this second. A single GPS fix under tree cover
+        // can read several km/h out, which had the arrival time swinging by a
+        // quarter of an hour while the athlete walked in a straight line. Until
+        // there is enough movement for an average to mean anything, the current
+        // speed still stands in.
+        let steadySpeed = metrics.movingTime > 180 && metrics.distance > 300
+            ? metrics.averageSpeed
+            : metrics.currentSpeed
+        if steadySpeed > 0.4 {
+            metrics.etaSeconds = metrics.remainingDistance / steadySpeed
         }
 
         if let next = route.waypoints.first(where: { $0.distanceAlongRoute > covered }) {
@@ -1351,7 +1385,7 @@ final class WorkoutEngine {
             metrics.distanceToWaypoint = metrics.remainingDistance
         }
 
-        updateCourseState(coordinate: coordinate, offBy: nearest.distance, route: route)
+        updateCourseState(coordinate: coordinate, offBy: position.offLine, route: route)
     }
 
     // MARK: - Navigation alerts

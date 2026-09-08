@@ -251,4 +251,8 @@ nonisolated struct WatchTrackPoint: Sendable, Equatable {
     var longitude: Double
     var altitude: Double
     var distance: Double
+    /// When the fix was recorded. Carried so the phone can hand a track to Health
+    /// or to Strava with the clock it was actually walked to, instead of spreading
+    /// the duration evenly over the points and inventing everybody's splits.
+    var time: Date = .now
 }

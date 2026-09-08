@@ -1,12 +1,21 @@
 import SwiftUI
 
+/// Where one optional connection has got to, in the three states a first-run
+/// card can honestly be in: it can be switched on, it is on, or it cannot be.
+private enum ConnectionState: Equatable {
+    case available(String)
+    case working
+    case connected(String)
+    case unavailable(String)
+}
+
 /// The steps of first run, in order.
 private enum OnboardingStep: Int, CaseIterable, Identifiable {
     case welcome
     case consent
     case name
     case units
-    case health
+    case connections
     case goals
     case fuel
     case ready
@@ -58,8 +67,14 @@ struct OnboardingView: View {
     @Environment(GoalSettings.self) private var goals
     @Environment(ProfileSettings.self) private var profile
     @Environment(ConsentSettings.self) private var consent
+    @Environment(StravaService.self) private var strava
 
     var onFinish: () -> Void
+
+    /// Location is a shared service rather than an environment value, because a
+    /// map opened anywhere in the app uses the same one.
+    @State private var location = MapLocationService.shared
+    @State private var isConnectingStrava = false
 
     @State private var step: OnboardingStep = .welcome
     @State private var energyTarget: Double = NutritionGoals.default.energyKilocalories
@@ -136,7 +151,7 @@ struct OnboardingView: View {
         case .consent: consentStep
         case .name: nameStep
         case .units: unitsStep
-        case .health: healthStep
+        case .connections: connectionsStep
         case .goals: goalsStep
         case .fuel: fuelStep
         case .ready: readyStep
@@ -264,40 +279,100 @@ struct OnboardingView: View {
         }
     }
 
-    private var healthStep: some View {
+    /// Everything Trekka can be plugged into, each one asked for separately.
+    ///
+    /// Deliberately one screen with three independent choices rather than three
+    /// screens in a row. Somebody who wants Health but not Strava, or a map
+    /// without either, can say so here and move on — and nothing is requested by
+    /// simply arriving on the step, so no system sheet appears unbidden.
+    ///
+    /// Only permissions Trekka actually uses are listed. There is no notification
+    /// row because the app never sends one, and asking for a permission you have
+    /// no use for is how an app teaches people to refuse everything.
+    private var connectionsStep: some View {
         VStack(alignment: .leading, spacing: 22) {
-            Image(systemName: "heart.text.square.fill")
-                .font(.system(size: 36, weight: .semibold))
-                .foregroundStyle(Theme.danger)
+            Image(systemName: "app.connected.to.app.below.fill")
+                .font(.system(size: 34, weight: .semibold))
+                .foregroundStyle(Theme.accent)
 
-            heading("Connect Apple Health", detail: "Trekka reads your steps, heart rate, sleep and workouts to fill the dashboard, and writes the workouts you record here back into Health.")
+            heading(
+                "What should Trekka connect to?",
+                detail: "Each of these is optional and each is separate. Turn any of them on now, or later in Settings — Trekka records and navigates without a single one."
+            )
 
             VStack(spacing: 10) {
-                pointRow("arrow.down.circle.fill", "Reads", "Steps, heart rate, sleep, energy and past workouts.")
-                pointRow("arrow.up.circle.fill", "Writes", "Workouts you record in Trekka, and food you log in Fuel.")
-                pointRow("lock.fill", "Stays yours", "Health data never leaves your phone through Trekka. There is no account and no server.")
+                healthConnectionRow
+                locationConnectionRow
+                if StravaService.isConfigured { stravaConnectionRow }
             }
 
-            switch health.authorization {
-            case .authorized:
-                statusRow(symbol: "checkmark.circle.fill", tint: Theme.positive, text: "Connected to Apple Health")
-            case .denied:
-                statusRow(
-                    symbol: "exclamationmark.circle.fill",
-                    tint: Theme.textPrimary.opacity(0.5),
-                    text: "Not connected. You can turn this on later in Settings — the rest of Trekka works without it."
-                )
-            case .unavailable:
-                statusRow(
-                    symbol: "info.circle.fill",
-                    tint: Theme.textPrimary.opacity(0.5),
-                    text: "Apple Health is not available on this device."
-                )
-            case .requesting:
-                statusRow(symbol: "hourglass", tint: Theme.accent, text: "Waiting for your answer…")
-            case .unknown:
-                EmptyView()
+            footnote("Your health data, routes and food diary stay on this phone. The only thing that ever leaves is a workout you send to Strava yourself.")
+        }
+    }
+
+    private var healthConnectionRow: some View {
+        connectionCard(
+            symbol: "heart.text.square.fill",
+            tint: Theme.danger,
+            title: "Apple Health",
+            detail: "Reads steps, heart rate, sleep and past workouts to fill your dashboard. Writes back what you record here.",
+            state: healthConnectionState
+        ) {
+            Task { await health.requestAuthorization() }
+        }
+    }
+
+    private var locationConnectionRow: some View {
+        connectionCard(
+            symbol: "location.fill",
+            tint: Theme.accent,
+            title: "Location",
+            detail: "Needed to draw the map around you and to record where a workout went. Only ever while you are using Trekka.",
+            state: locationConnectionState
+        ) {
+            location.requestAccess()
+        }
+    }
+
+    private var stravaConnectionRow: some View {
+        connectionCard(
+            symbol: "figure.run.circle.fill",
+            tint: Theme.accent,
+            title: "Strava",
+            detail: "Send finished workouts to Strava. Sign-in happens on Strava's own page — Trekka never sees your password.",
+            state: stravaConnectionState
+        ) {
+            Task {
+                isConnectingStrava = true
+                await strava.connect()
+                isConnectingStrava = false
             }
+        }
+    }
+
+    private var healthConnectionState: ConnectionState {
+        switch health.authorization {
+        case .authorized: .connected("Connected")
+        case .requesting: .working
+        case .denied: .unavailable("Declined · change in the Settings app")
+        case .unavailable: .unavailable("Not available on this device")
+        case .unknown: .available("Connect")
+        }
+    }
+
+    private var locationConnectionState: ConnectionState {
+        if location.isAuthorized { return .connected("Allowed") }
+        if location.isDenied { return .unavailable("Declined · change in the Settings app") }
+        return .available("Allow")
+    }
+
+    private var stravaConnectionState: ConnectionState {
+        if isConnectingStrava { return .working }
+        switch strava.connection {
+        case let .connected(athlete): return .connected(athlete ?? "Connected")
+        case .connecting: return .working
+        case .notConfigured: return .unavailable("Not available in this build")
+        case .failed, .signedOut: return .available("Sign in")
         }
     }
 
@@ -408,7 +483,7 @@ struct OnboardingView: View {
         case .consent: "Agree & continue"
         case .name: name.isEmpty ? "Continue" : "Nice to meet you"
         case .units: "Continue"
-        case .health: health.authorization == .authorized ? "Continue" : "Connect Apple Health"
+        case .connections: "Continue"
         case .goals: goals.isEmpty ? "Continue" : "Save \(goals.metricsWithGoals.count) goal\(goals.metricsWithGoals.count == 1 ? "" : "s")"
         case .fuel: setsFuelGoal ? "Save target" : "Continue"
         case .ready: "Start using Trekka"
@@ -427,7 +502,7 @@ struct OnboardingView: View {
         // A step that cannot be passed should not appear to have a way around it.
         case .consent: nil
         case .name where !name.isEmpty: "Skip"
-        case .health where health.authorization != .authorized: "Not now"
+        case .connections where health.authorization != .authorized: "Skip for now"
         case .goals where !goals.isEmpty: "No goals for now"
         case .fuel where setsFuelGoal: "Skip for now"
         default: nil
@@ -445,15 +520,6 @@ struct OnboardingView: View {
             profile.setName(name)
             isNamingSelf = false
             step = .units
-        case .health where health.authorization != .authorized
-            && health.authorization != .unavailable
-            && health.authorization != .denied:
-            // The system sheet is the whole point of this step, so the step is
-            // held until the answer comes back rather than moving on behind it.
-            Task {
-                await health.requestAuthorization()
-                step = .goals
-            }
         case .fuel:
             if setsFuelGoal {
                 var goals = NutritionGoals.default
@@ -478,7 +544,7 @@ struct OnboardingView: View {
             name = ""
             isNamingSelf = false
             step = .units
-        case .health: step = .goals
+        case .connections: step = .goals
         case .goals:
             // Turning them all off is the honest reading of "no goals for now" —
             // anything toggled while browsing should not be kept by accident.
@@ -577,6 +643,88 @@ struct OnboardingView: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
+    }
+
+    /// One optional connection: what it is for, and a single control that either
+    /// turns it on or explains why it cannot be turned on here.
+    ///
+    /// A connection already granted becomes a plain statement rather than a
+    /// disabled button — there is nothing left to do, and a greyed-out control
+    /// invites people to keep tapping it.
+    @ViewBuilder
+    private func connectionCard(
+        symbol: String,
+        tint: Color,
+        title: String,
+        detail: String,
+        state: ConnectionState,
+        action: @escaping () -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: symbol)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 34, height: 34)
+                    .background(tint.opacity(0.12), in: .rect(cornerRadius: 10))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(.subheadline, weight: .bold))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(Theme.textPrimary.opacity(0.55))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 0)
+            }
+
+            switch state {
+            case let .available(label):
+                Button {
+                    feedback += 1
+                    action()
+                } label: {
+                    Text(label)
+                        .font(.system(.subheadline, weight: .bold))
+                        .foregroundStyle(Theme.canvas)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(tint, in: .rect(cornerRadius: 11))
+                }
+                .buttonStyle(.plain)
+
+            case .working:
+                HStack(spacing: 8) {
+                    ProgressView().tint(tint)
+                    Text("Waiting for your answer…")
+                        .font(.system(.caption, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary.opacity(0.6))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            case let .connected(label):
+                Label(label, systemImage: "checkmark.circle.fill")
+                    .font(.system(.caption, weight: .semibold))
+                    .foregroundStyle(Theme.positive)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+            case let .unavailable(label):
+                Label(label, systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(Theme.textPrimary.opacity(0.5))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(13)
+        .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.cardRadius)
+                .strokeBorder(Theme.border, lineWidth: 1)
+        }
+        .animation(.snappy(duration: 0.25), value: state)
     }
 
     private func statusRow(symbol: String, tint: Color, text: String) -> some View {
