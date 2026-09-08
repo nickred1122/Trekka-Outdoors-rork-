@@ -15,6 +15,7 @@ struct ContentView: View {
     @State private var goalSettings = GoalSettings()
     @State private var profile = ProfileSettings()
     @State private var onboarding = OnboardingState()
+    @State private var consent = ConsentSettings()
     @State private var cloudBackup = CloudBackupService()
     @State private var autoBackup = AutoBackupSettings()
     @State private var watchLink = WatchLink.shared
@@ -83,17 +84,25 @@ struct ContentView: View {
         .environment(autoBackup)
         .environment(goalSettings)
         .environment(profile)
+        .environment(consent)
         .environment(\.unitSystem, units.system)
         .preferredColorScheme(appearance.colorScheme)
-        .fullScreenCover(isPresented: .constant(!onboarding.isComplete)) {
-            OnboardingView { onboarding.complete() }
-                .environment(health)
-                .environment(units)
-                .environment(watchLayout)
-                .environment(nutrition)
-                .environment(goalSettings)
-                .environment(profile)
-                .environment(\.unitSystem, units.system)
+        .fullScreenCover(item: .constant(launchGate)) { gate in
+            switch gate {
+            case .onboarding:
+                OnboardingView { onboarding.complete() }
+                    .environment(health)
+                    .environment(units)
+                    .environment(watchLayout)
+                    .environment(nutrition)
+                    .environment(goalSettings)
+                    .environment(profile)
+                    .environment(consent)
+                    .environment(\.unitSystem, units.system)
+            case .consent:
+                ConsentGateView {}
+                    .environment(consent)
+            }
         }
         .fullScreenCover(isPresented: $showsWorkout) {
             LiveWorkoutView(initialRoute: pendingWorkoutRoute)
@@ -189,6 +198,17 @@ struct ContentView: View {
         .onChange(of: store.activities.count) { _, _ in
             pushDashboard()
         }
+    }
+
+    /// What, if anything, stands between launch and the app.
+    ///
+    /// The agreements are checked separately from first run, so somebody who was
+    /// already using Trekka before this existed is still asked — they are not
+    /// walked through onboarding again, but they do not get in without agreeing.
+    private var launchGate: LaunchGate? {
+        if !onboarding.isComplete { return .onboarding }
+        if !consent.isAccepted { return .consent }
+        return nil
     }
 
     // MARK: - Screens
@@ -343,6 +363,14 @@ struct ContentView: View {
             MapLibraryView()
         }
     }
+}
+
+/// The two things that can hold the app closed at launch.
+private enum LaunchGate: String, Identifiable {
+    case onboarding
+    case consent
+
+    var id: String { rawValue }
 }
 
 /// Keeps each tab's navigation state alive once visited, without building screens

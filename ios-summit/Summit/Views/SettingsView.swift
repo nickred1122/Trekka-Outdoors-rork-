@@ -18,10 +18,12 @@ struct SettingsView: View {
     @Environment(MapPackStore.self) private var mapPacks
     @Environment(ProfileSettings.self) private var profile
     @Environment(GoalSettings.self) private var goals
+    @Environment(ConsentSettings.self) private var consent
     @Binding var path: NavigationPath
 
     @State private var showsHealthSheet = false
     @State private var showsCustomizeSheet = false
+    @State private var readingDocument: LegalDocument?
     @State private var draftName = ""
     @FocusState private var isEditingName: Bool
     @State private var feedback = 0
@@ -177,6 +179,8 @@ struct SettingsView: View {
                         .padding(.bottom, 12)
                 }
 
+                legalSection
+
                 aboutCard
             }
             .padding(.horizontal, 16)
@@ -188,6 +192,7 @@ struct SettingsView: View {
         .sensoryFeedback(.success, trigger: feedback)
         .sheet(isPresented: $showsHealthSheet) { HealthAccessSheet() }
         .sheet(isPresented: $showsCustomizeSheet) { CustomizeDashboardView() }
+        .sheet(item: $readingDocument) { LegalDocumentView(document: $0) }
         .onAppear { draftName = profile.name }
         // Committed when the field loses focus as well as on return, so a name
         // typed and then scrolled away from is not quietly thrown away.
@@ -210,6 +215,39 @@ struct SettingsView: View {
         return extra > 0
             ? "\(first.goalSummary(target)) · +\(extra) more"
             : first.goalSummary(target)
+    }
+
+    /// The agreements, kept reachable after they were accepted. Somebody who
+    /// ticked three boxes on their first morning should be able to find out
+    /// later what they actually agreed to.
+    private var legalSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Legal")
+                .metricLabelStyle()
+                .padding(.leading, 4)
+            VStack(spacing: 0) {
+                ForEach(Array(LegalDocument.all.enumerated()), id: \.element.id) { index, document in
+                    if index > 0 { divider }
+                    row(
+                        symbol: document.symbol,
+                        title: document.title,
+                        detail: document.summary
+                    ) {
+                        readingDocument = document
+                    }
+                }
+
+                if let accepted = consent.acceptedDateText {
+                    Text("Accepted \(accepted). Trekka is a fitness app, not a medical device — it gives an overview of your health and training, never a diagnosis.")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textPrimary.opacity(0.45))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                }
+            }
+            .panel()
+        }
     }
 
     // MARK: - Cards

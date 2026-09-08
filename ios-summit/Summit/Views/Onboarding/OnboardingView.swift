@@ -3,6 +3,7 @@ import SwiftUI
 /// The steps of first run, in order.
 private enum OnboardingStep: Int, CaseIterable, Identifiable {
     case welcome
+    case consent
     case name
     case units
     case health
@@ -43,11 +44,12 @@ final class OnboardingState {
     }
 }
 
-/// First run: what the app is, how it should measure, whether it may read
-/// Health, and what a day's eating should aim at.
+/// First run: what the app is, what the athlete is agreeing to, how it should
+/// measure, whether it may read Health, and what a day's eating should aim at.
 ///
-/// Every step is skippable and nothing here is asked twice — each choice is
-/// also in Settings afterwards.
+/// Every step is skippable except the agreements — a person can decline to name
+/// themselves or set a goal, but they cannot use the app without accepting the
+/// terms, the privacy statement and the health notice.
 struct OnboardingView: View {
     @Environment(HealthService.self) private var health
     @Environment(UnitSettings.self) private var units
@@ -55,6 +57,7 @@ struct OnboardingView: View {
     @Environment(NutritionStore.self) private var nutrition
     @Environment(GoalSettings.self) private var goals
     @Environment(ProfileSettings.self) private var profile
+    @Environment(ConsentSettings.self) private var consent
 
     var onFinish: () -> Void
 
@@ -63,6 +66,7 @@ struct OnboardingView: View {
     @State private var split: MacroSplit = .balanced
     @State private var setsFuelGoal = false
     @State private var name = ""
+    @State private var acceptedDocuments: Set<LegalDocumentKind> = []
     @FocusState private var isNamingSelf: Bool
     @State private var feedback = 0
 
@@ -129,12 +133,32 @@ struct OnboardingView: View {
     private var stepContent: some View {
         switch step {
         case .welcome: welcomeStep
+        case .consent: consentStep
         case .name: nameStep
         case .units: unitsStep
         case .health: healthStep
         case .goals: goalsStep
         case .fuel: fuelStep
         case .ready: readyStep
+        }
+    }
+
+    /// The one step with no way past it. Nothing is recorded until the button is
+    /// pressed, so ticking boxes and then quitting leaves no agreement behind.
+    private var consentStep: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            Image(systemName: "hand.raised.fill")
+                .font(.system(size: 34, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+
+            heading(
+                "Before you start",
+                detail: "Three things to read and agree to. They are short, they are in plain English, and they stay in Settings if you want them later."
+            )
+
+            ConsentChecklist(accepted: $acceptedDocuments) { feedback += 1 }
+
+            footnote("Trekka is a fitness app, not a medical device. It gives you an overview of your health and training — never a diagnosis or medical advice.")
         }
     }
 
@@ -381,6 +405,7 @@ struct OnboardingView: View {
     private var primaryTitle: String {
         switch step {
         case .welcome: "Get started"
+        case .consent: "Agree & continue"
         case .name: name.isEmpty ? "Continue" : "Nice to meet you"
         case .units: "Continue"
         case .health: health.authorization == .authorized ? "Continue" : "Connect Apple Health"
@@ -390,8 +415,17 @@ struct OnboardingView: View {
         }
     }
 
+    /// Every step continues freely except the agreements, which need all three.
+    private var isPrimaryEnabled: Bool {
+        guard step == .consent else { return true }
+        return acceptedDocuments.count == LegalDocument.all.count
+    }
+
     private var secondaryTitle: String? {
         switch step {
+        // No skip is offered on the agreements, and no "maybe later" either.
+        // A step that cannot be passed should not appear to have a way around it.
+        case .consent: nil
         case .name where !name.isEmpty: "Skip"
         case .health where health.authorization != .authorized: "Not now"
         case .goals where !goals.isEmpty: "No goals for now"
@@ -403,6 +437,10 @@ struct OnboardingView: View {
     private func advance() {
         feedback += 1
         switch step {
+        case .consent:
+            guard isPrimaryEnabled else { return }
+            consent.acceptAll()
+            step = .name
         case .name:
             profile.setName(name)
             isNamingSelf = false
