@@ -162,6 +162,7 @@ struct ContentView: View {
             // earlier session, the data loads straight away instead of asking
             // the user to connect Apple Health all over again.
             await health.resume()
+            mirrorBodyMassToWatch()
 
             // A route's "has an offline map" flag travels to the watch, so it
             // is kept level with the packs actually on disk rather than being
@@ -187,7 +188,10 @@ struct ContentView: View {
             pushEverything()
             // Health sharing can be changed in the Health app while this app is
             // in the background, so the state is re-read on the way back in.
-            Task { await health.resume() }
+            Task {
+                await health.resume()
+                mirrorBodyMassToWatch()
+            }
             // iOS promises no background window, so a scheduled backup is taken
             // whenever the app is genuinely in front of the athlete again.
             Task { await autoBackup.runIfDue(cloud: cloudBackup, stores: backupStores) }
@@ -334,6 +338,15 @@ struct ContentView: View {
     private func pushEverything() {
         pushDashboard()
         watchLayout.pushSilently()
+    }
+
+    /// Sends the latest body mass to the wrist so bodyweight gym sets are scored
+    /// against real weight there. Only written when it actually moved, so this
+    /// does not trigger a sync on every return to the foreground.
+    private func mirrorBodyMassToWatch() {
+        let mass = health.snapshot.bodyMass
+        guard mass > 0, abs(watchLayout.bodyMassKilograms - mass) > 0.05 else { return }
+        watchLayout.bodyMassKilograms = mass
     }
 
     @ViewBuilder

@@ -42,6 +42,15 @@ final class WatchLayoutStore {
     /// being told how long one is, so this is what makes lengths and SWOLF
     /// possible at all — there is no way to infer it from the wrist.
     var poolLengthMetres: Double = 25 { didSet { persist() } }
+    /// Latest body mass in kilograms, mirrored to the wrist purely so bodyweight
+    /// gym sets score against real weight there rather than a placeholder. Not
+    /// something the athlete edits here — it comes from Health.
+    var bodyMassKilograms: Double = 0 {
+        didSet {
+            GymExerciseLibrary.bodyMassKilograms = bodyMassKilograms > 0 ? bodyMassKilograms : 75
+            persist()
+        }
+    }
     /// Colour of the planned course line, on both devices.
     var routeTrailColor: TrailColor = .orange {
         didSet {
@@ -251,6 +260,7 @@ final class WatchLayoutStore {
         confirmsWorkoutEnd = payload.confirmsWorkoutEnd ?? confirmsWorkoutEnd
         maxHeartRate = payload.maxHeartRate
         poolLengthMetres = payload.poolLengthMetres ?? poolLengthMetres
+        bodyMassKilograms = payload.bodyMassKilograms ?? bodyMassKilograms
         unitSystem = payload.unitSystem.flatMap(UnitSystem.init(rawValue:)) ?? unitSystem
         massSystem = payload.massSystem.flatMap(UnitSystem.init(rawValue:)) ?? massSystem
         elevationSystem = payload.elevationSystem.flatMap(UnitSystem.init(rawValue:)) ?? elevationSystem
@@ -321,6 +331,7 @@ final class WatchLayoutStore {
         var fieldTint: String?
         var metricWeight: String?
         var poolLengthMetres: Double?
+        var bodyMassKilograms: Double?
     }
 
     private var recents: [String] = []
@@ -348,6 +359,7 @@ final class WatchLayoutStore {
         confirmsWorkoutEnd = payload.confirmsWorkoutEnd ?? true
         maxHeartRate = payload.maxHeartRate
         poolLengthMetres = payload.poolLengthMetres ?? 25
+        bodyMassKilograms = payload.bodyMassKilograms ?? 0
         unitSystem = payload.unitSystem.flatMap(UnitSystem.init(rawValue:)) ?? .deviceDefault
         massSystem = payload.massSystem.flatMap(UnitSystem.init(rawValue:)) ?? .deviceDefault
         elevationSystem = payload.elevationSystem.flatMap(UnitSystem.init(rawValue:)) ?? .deviceDefault
@@ -386,7 +398,8 @@ final class WatchLayoutStore {
             metricTypeface: metricTypeface,
             fieldTint: fieldTint,
             metricWeight: metricWeight,
-            poolLengthMetres: poolLengthMetres
+            poolLengthMetres: poolLengthMetres,
+            bodyMassKilograms: bodyMassKilograms
         )
         return try? JSONEncoder().encode(payload)
     }

@@ -15,9 +15,21 @@ nonisolated struct StrengthSet: Identifiable, Sendable, Equatable, Hashable, Cod
     var weightKilograms: Double
     var loggedAt: Date = .now
 
+    /// What this set actually moved, per rep, in kilograms.
+    ///
+    /// For a barbell movement that is simply the dialled load. For a press-up or
+    /// a pull-up it is the share of your own body the movement carries, because
+    /// otherwise the set scores zero — a session of forty pull-ups used to report
+    /// nothing moved at all. Load dialled in on a bodyweight movement is treated
+    /// as *added* weight and stacks on top, which is what a dipping belt is.
+    var loadKilograms: Double {
+        let bodyShare = GymExerciseLibrary.exercise(named: exercise)?.bodyLoadKilograms ?? 0
+        return bodyShare + max(0, weightKilograms)
+    }
+
     /// Reps times load — the number that actually tracks progress from week to
     /// week, since more reps at a lighter weight can beat fewer at a heavier one.
-    var volume: Double { Double(reps) * weightKilograms }
+    var volume: Double { Double(reps) * loadKilograms }
 
     var isBodyweight: Bool { weightKilograms <= 0 }
 }
@@ -63,13 +75,25 @@ nonisolated struct GymExercise: Identifiable, Hashable, Sendable {
     /// Bodyweight movements start at zero load rather than at a bar weight, so
     /// the dial does not have to be wound back down every time.
     let isBodyweightByDefault: Bool
+    /// Share of body mass the movement actually lifts. A pull-up takes all of
+    /// you; a press-up takes roughly two thirds because your feet stay down. A
+    /// plank holds rather than moves you, so it scores no volume.
+    let bodyLoadShare: Double
 
     var id: String { name }
 
-    init(_ name: String, _ group: GymMuscleGroup, bodyweight: Bool = false) {
+    /// The movement's share of body mass in kilograms, using whatever weight the
+    /// athlete last recorded.
+    var bodyLoadKilograms: Double {
+        guard isBodyweightByDefault else { return 0 }
+        return GymExerciseLibrary.bodyMassKilograms * bodyLoadShare
+    }
+
+    init(_ name: String, _ group: GymMuscleGroup, bodyweight: Bool = false, share: Double = 1) {
         self.name = name
         self.group = group
         self.isBodyweightByDefault = bodyweight
+        self.bodyLoadShare = bodyweight ? share : 0
     }
 }
 
@@ -78,6 +102,14 @@ nonisolated struct GymExercise: Identifiable, Hashable, Sendable {
 /// The same curated list as on the wrist, so a set logged on the watch reads
 /// back here under a name the phone recognises.
 nonisolated enum GymExerciseLibrary {
+    /// Body mass used to score bodyweight work, in kilograms. Set from the
+    /// athlete's latest Health reading at launch, the same way the heart-rate
+    /// ceiling and unit choices are mirrored into their static holders.
+    ///
+    /// The default is a placeholder for the gap before Health answers; it only
+    /// affects how bodyweight volume is scaled, never whether a set is recorded.
+    nonisolated(unsafe) static var bodyMassKilograms: Double = 75
+
     static let all: [GymExercise] = [
         // Chest
         GymExercise("Bench Press", .chest),
@@ -86,8 +118,8 @@ nonisolated enum GymExerciseLibrary {
         GymExercise("Incline Dumbbell Press", .chest),
         GymExercise("Chest Fly", .chest),
         GymExercise("Cable Crossover", .chest),
-        GymExercise("Press-Up", .chest, bodyweight: true),
-        GymExercise("Dip", .chest, bodyweight: true),
+        GymExercise("Press-Up", .chest, bodyweight: true, share: 0.64),
+        GymExercise("Dip", .chest, bodyweight: true, share: 1),
 
         // Back
         GymExercise("Deadlift", .back),
@@ -96,8 +128,8 @@ nonisolated enum GymExerciseLibrary {
         GymExercise("Dumbbell Row", .back),
         GymExercise("Lat Pulldown", .back),
         GymExercise("Seated Cable Row", .back),
-        GymExercise("Pull-Up", .back, bodyweight: true),
-        GymExercise("Chin-Up", .back, bodyweight: true),
+        GymExercise("Pull-Up", .back, bodyweight: true, share: 1),
+        GymExercise("Chin-Up", .back, bodyweight: true, share: 1),
         GymExercise("Face Pull", .back),
         GymExercise("Shrug", .back),
 
@@ -134,12 +166,13 @@ nonisolated enum GymExerciseLibrary {
         GymExercise("Close-Grip Bench Press", .arms),
 
         // Core
-        GymExercise("Plank", .core, bodyweight: true),
-        GymExercise("Hanging Leg Raise", .core, bodyweight: true),
+        // A plank is a hold: nothing travels, so it earns no volume.
+        GymExercise("Plank", .core, bodyweight: true, share: 0),
+        GymExercise("Hanging Leg Raise", .core, bodyweight: true, share: 0.5),
         GymExercise("Cable Crunch", .core),
         GymExercise("Russian Twist", .core),
-        GymExercise("Ab Wheel", .core, bodyweight: true),
-        GymExercise("Back Extension", .core, bodyweight: true),
+        GymExercise("Ab Wheel", .core, bodyweight: true, share: 0.6),
+        GymExercise("Back Extension", .core, bodyweight: true, share: 0.45),
     ]
 
     static func exercises(in group: GymMuscleGroup) -> [GymExercise] {

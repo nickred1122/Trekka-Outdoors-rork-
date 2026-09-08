@@ -82,6 +82,11 @@ final class HealthService {
         if let loaded = result.snapshot {
             snapshot = loaded
             hasHealthData = true
+            // Bodyweight sets are scored against real body mass, so the gym
+            // library needs the latest reading the moment it lands.
+            if loaded.bodyMass > 0 {
+                GymExerciseLibrary.bodyMassKilograms = loaded.bodyMass
+            }
         }
         healthActivities = result.activities
 

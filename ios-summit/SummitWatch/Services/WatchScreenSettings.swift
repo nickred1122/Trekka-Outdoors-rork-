@@ -82,6 +82,14 @@ final class WatchScreenSettings {
     /// being told how long one is, so this is what makes lengths and SWOLF
     /// possible at all — there is no way to infer it from the wrist.
     var poolLengthMetres: Double = 25 { didSet { persist() } }
+    /// Latest body mass in kilograms, sent over from the phone's Health data so
+    /// bodyweight gym sets score against real weight rather than a placeholder.
+    var bodyMassKilograms: Double = 0 {
+        didSet {
+            GymExerciseLibrary.bodyMassKilograms = bodyMassKilograms > 0 ? bodyMassKilograms : 75
+            persist()
+        }
+    }
     /// Metric or imperial. Mirrored into `WatchFormat` so every cell, banner and
     /// summary on the wrist converts the same way.
     var unitSystem: UnitSystem = .deviceDefault {
@@ -118,6 +126,7 @@ final class WatchScreenSettings {
         WatchFormat.units = unitSystem
         WatchFormat.massUnits = massSystem
         WatchFormat.elevationUnits = elevationSystem
+        GymExerciseLibrary.bodyMassKilograms = bodyMassKilograms > 0 ? bodyMassKilograms : 75
         applyMetricStyle()
     }
 
@@ -273,12 +282,22 @@ final class WatchScreenSettings {
 
     /// Applies a layout document pushed from the phone over WatchConnectivity.
     /// The payload is exactly what this store persists, so decoding is native.
+    ///
+    /// What gets written to disk afterwards is the *merged* state, not the bytes
+    /// that arrived. This is the whole reason wrist-only settings used to vanish:
+    /// every field below that the phone does not send arrives as nil and falls
+    /// back to the value already in memory — correct in memory, but the old code
+    /// then saved the phone's document verbatim, so the next launch read a file
+    /// with those keys missing and reset them to their defaults. A sync from the
+    /// phone silently wiped the action button, the countdown and the rest.
     func applyIncoming(_ data: Data) {
         guard let payload = try? JSONDecoder().decode(Payload.self, from: data) else { return }
         isApplyingRemoteEdit = true
         defer {
             isApplyingRemoteEdit = false
-            UserDefaults.standard.set(data, forKey: defaultsKey)
+            // Save what we ended up with, and do not echo it back to the phone:
+            // it is the phone's own edit arriving, not a change made here.
+            persist(echoingToPhone: false)
         }
         screensBySport = payload.screens
         recentSportIDs = payload.recents
@@ -304,6 +323,7 @@ final class WatchScreenSettings {
         metricWeight = payload.metricWeight.flatMap(MetricWeightChoice.init(rawValue:)) ?? metricWeight
         maxHeartRate = payload.maxHeartRate
         poolLengthMetres = payload.poolLengthMetres ?? poolLengthMetres
+        bodyMassKilograms = payload.bodyMassKilograms ?? bodyMassKilograms
         quickAction = payload.quickAction.flatMap(WatchQuickAction.init(rawValue:)) ?? quickAction
         unitSystem = payload.unitSystem.flatMap(UnitSystem.init(rawValue:)) ?? unitSystem
         massSystem = payload.massSystem.flatMap(UnitSystem.init(rawValue:)) ?? massSystem
@@ -359,6 +379,7 @@ final class WatchScreenSettings {
         var fieldTint: String?
         var metricWeight: String?
         var poolLengthMetres: Double?
+        var bodyMassKilograms: Double?
         var quickAction: String?
     }
 
@@ -389,6 +410,7 @@ final class WatchScreenSettings {
         metricWeight = payload.metricWeight.flatMap(MetricWeightChoice.init(rawValue:)) ?? .standard
         maxHeartRate = payload.maxHeartRate
         poolLengthMetres = payload.poolLengthMetres ?? 25
+        bodyMassKilograms = payload.bodyMassKilograms ?? 0
         quickAction = payload.quickAction.flatMap(WatchQuickAction.init(rawValue:)) ?? .pauseResume
         unitSystem = payload.unitSystem.flatMap(UnitSystem.init(rawValue:)) ?? .deviceDefault
         massSystem = payload.massSystem.flatMap(UnitSystem.init(rawValue:)) ?? .deviceDefault
@@ -397,6 +419,10 @@ final class WatchScreenSettings {
 
     private func persist() {
         guard !isApplyingRemoteEdit else { return }
+        persist(echoingToPhone: true)
+    }
+
+    private func persist(echoingToPhone: Bool) {
         let payload = Payload(
             screens: screensBySport,
             recents: recentSportIDs,
@@ -425,10 +451,11 @@ final class WatchScreenSettings {
             fieldTint: fieldTint.rawValue,
             metricWeight: metricWeight.rawValue,
             poolLengthMetres: poolLengthMetres,
+            bodyMassKilograms: bodyMassKilograms,
             quickAction: quickAction.rawValue
         )
         guard let data = try? JSONEncoder().encode(payload) else { return }
         UserDefaults.standard.set(data, forKey: defaultsKey)
-        onLocalChange?(data)
+        if echoingToPhone { onLocalChange?(data) }
     }
 }
