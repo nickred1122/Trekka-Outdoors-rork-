@@ -187,14 +187,31 @@ final class StravaService {
 
     // MARK: - Configuration
 
-    /// Strava issues these when an app is registered; they are injected at build
-    /// time rather than typed into the source.
+    /// The keys Strava issued when Trekka Outdoors was registered (application
+    /// 195885, callback domain `trekkaoutdoors.com`).
+    ///
+    /// They are written here rather than kept out of the source because Strava's
+    /// mobile flow has no PKCE: the token exchange demands the client secret from
+    /// the app itself, so any build of Trekka carries it regardless of where it is
+    /// read from. Extracting it from the shipped binary is trivial, which is why
+    /// Strava treats a mobile client secret as identifying, not protecting. It
+    /// grants nothing on its own — every request still needs a token the athlete
+    /// personally granted on Strava's own page, and it cannot read or touch any
+    /// account that has not signed in here.
+    ///
+    /// A build-time value still wins if one is supplied, so the keys can be moved
+    /// or rotated without another release.
+    private static let registeredClientID = "195885"
+    private static let registeredClientSecret = "6d48ee20afedc178490d43d7f57893e08f5c56f7"
+
     private static var clientID: String {
-        Config.allValues["EXPO_PUBLIC_STRAVA_CLIENT_ID"] ?? ""
+        let injected = Config.allValues["EXPO_PUBLIC_STRAVA_CLIENT_ID"] ?? ""
+        return injected.isEmpty ? registeredClientID : injected
     }
 
     private static var clientSecret: String {
-        Config.allValues["EXPO_PUBLIC_STRAVA_CLIENT_SECRET"] ?? ""
+        let injected = Config.allValues["EXPO_PUBLIC_STRAVA_CLIENT_SECRET"] ?? ""
+        return injected.isEmpty ? registeredClientSecret : injected
     }
 
     static var isConfigured: Bool {

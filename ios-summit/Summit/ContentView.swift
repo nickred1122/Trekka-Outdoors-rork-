@@ -111,6 +111,7 @@ struct ContentView: View {
             case .onboarding:
                 OnboardingView { onboarding.complete() }
                     .environment(health)
+                    .environment(strava)
                     .environment(units)
                     .environment(watchLayout)
                     .environment(nutrition)
