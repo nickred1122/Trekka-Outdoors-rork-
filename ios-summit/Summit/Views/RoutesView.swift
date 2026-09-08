@@ -152,15 +152,6 @@ struct RoutesView: View {
             locateToken: locateToken
         )
         .frame(height: 420)
-        .overlay(alignment: .bottom) {
-            LinearGradient(
-                colors: [.clear, Theme.canvas.opacity(0.55), Theme.canvas],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 150)
-            .allowsHitTesting(false)
-        }
         .overlay(alignment: .topTrailing) { mapControls }
         .overlay(alignment: .topLeading) { mapBadge }
         .overlay(alignment: .bottom) {
