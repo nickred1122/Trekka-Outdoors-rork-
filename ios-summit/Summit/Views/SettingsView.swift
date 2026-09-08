@@ -4,6 +4,7 @@ nonisolated enum SettingsDestination: Hashable, Sendable {
     case watch
     case backup
     case goals
+    case eventLog
 }
 
 /// Everything that configures Trekka, gathered in one place instead of hiding
@@ -179,6 +180,17 @@ struct SettingsView: View {
                         .padding(.bottom, 12)
                 }
 
+                section("Diagnostics") {
+                    row(
+                        symbol: "list.bullet.rectangle",
+                        title: "Event log",
+                        detail: eventLogDetail,
+                        tint: EventLog.shared.failureCount > 0 ? Theme.danger : Theme.accent
+                    ) {
+                        path.append(SettingsDestination.eventLog)
+                    }
+                }
+
                 legalSection
 
                 aboutCard
@@ -205,6 +217,16 @@ struct SettingsView: View {
     private func commitName() {
         profile.setName(draftName)
         draftName = profile.name
+    }
+
+    private var eventLogDetail: String {
+        let log = EventLog.shared
+        guard !log.events.isEmpty else { return "Nothing recorded yet" }
+        let failures = log.failureCount
+        guard failures > 0 else {
+            return "\(log.events.count) event\(log.events.count == 1 ? "" : "s") · no failures"
+        }
+        return "\(failures) failure\(failures == 1 ? "" : "s") of \(log.events.count) event\(log.events.count == 1 ? "" : "s")"
     }
 
     private var goalDetail: String {

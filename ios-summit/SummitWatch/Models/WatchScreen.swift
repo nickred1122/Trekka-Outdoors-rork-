@@ -11,6 +11,7 @@ nonisolated enum WatchScreenKind: String, Codable, CaseIterable, Sendable, Ident
     case laps
     case compass
     case sets
+    case music
 
     var id: String { rawValue }
 
@@ -25,6 +26,7 @@ nonisolated enum WatchScreenKind: String, Codable, CaseIterable, Sendable, Ident
         case .laps: "Laps"
         case .compass: "Compass"
         case .sets: "Sets and Reps"
+        case .music: "Music"
         }
     }
 
@@ -39,6 +41,7 @@ nonisolated enum WatchScreenKind: String, Codable, CaseIterable, Sendable, Ident
         case .laps: "flag.checkered"
         case .compass: "location.north.circle.fill"
         case .sets: "dumbbell.fill"
+        case .music: "music.note"
         }
     }
 
@@ -53,6 +56,7 @@ nonisolated enum WatchScreenKind: String, Codable, CaseIterable, Sendable, Ident
         case .laps: "Every split as you record it"
         case .compass: "Bearing and direction of travel"
         case .sets: "Log every set as you lift it"
+        case .music: "Control whatever is playing, without leaving the workout"
         }
     }
 

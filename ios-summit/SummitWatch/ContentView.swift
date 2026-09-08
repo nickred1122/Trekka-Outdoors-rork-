@@ -87,7 +87,19 @@ struct ContentView: View {
 
     private var startList: some View {
         List {
-            Section("Start") {
+            // Pinned sports come first and stay put. Recents below them are
+            // whatever was last recorded, so the two never fight for the top.
+            if !settings.pinnedSports.isEmpty {
+                Section("Favourites") {
+                    ForEach(settings.pinnedSports) { sport in
+                        NavigationLink(value: WatchStartRoute.sport(sport)) {
+                            sportRow(sport, isPrimary: true)
+                        }
+                    }
+                }
+            }
+
+            Section(settings.pinnedSports.isEmpty ? "Start" : "Recent") {
                 ForEach(recents) { sport in
                     NavigationLink(value: WatchStartRoute.sport(sport)) {
                         sportRow(sport, isPrimary: true)
@@ -167,6 +179,11 @@ struct ContentView: View {
                 .foregroundStyle(WatchTheme.textPrimary)
                 .lineLimit(1)
             Spacer(minLength: 0)
+            if settings.isPinned(sport) {
+                Image(systemName: "pin.fill")
+                    .font(.system(size: 8))
+                    .foregroundStyle(sport.tint)
+            }
             if settings.isCustomized(sport) {
                 Image(systemName: "slider.horizontal.3")
                     .font(.system(size: 8))
@@ -174,6 +191,18 @@ struct ContentView: View {
             }
         }
         .padding(.vertical, 1)
+        // Long press rather than a swipe: swipes belong to the page carousel
+        // this list sits inside.
+        .contextMenu {
+            Button {
+                settings.togglePin(sport)
+            } label: {
+                Label(
+                    settings.isPinned(sport) ? "Unpin" : "Pin to top",
+                    systemImage: settings.isPinned(sport) ? "pin.slash" : "pin"
+                )
+            }
+        }
     }
 }
 

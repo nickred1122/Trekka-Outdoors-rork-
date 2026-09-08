@@ -111,68 +111,86 @@ nonisolated enum GymExerciseLibrary {
     nonisolated(unsafe) static var bodyMassKilograms: Double = 75
 
     static let all: [GymExercise] = [
-        // Chest
+        // Chest — alphabetical within the group, as every group below is, so a
+        // movement is found by its name rather than by remembering where in the
+        // list somebody once typed it.
         GymExercise("Bench Press", .chest),
-        GymExercise("Incline Bench Press", .chest),
-        GymExercise("Dumbbell Press", .chest),
-        GymExercise("Incline Dumbbell Press", .chest),
-        GymExercise("Chest Fly", .chest),
         GymExercise("Cable Crossover", .chest),
-        GymExercise("Press-Up", .chest, bodyweight: true, share: 0.64),
+        GymExercise("Chest Fly", .chest),
+        GymExercise("Chest Press Machine", .chest),
         GymExercise("Dip", .chest, bodyweight: true, share: 1),
+        GymExercise("Dumbbell Press", .chest),
+        GymExercise("Incline Bench Press", .chest),
+        GymExercise("Incline Dumbbell Press", .chest),
+        GymExercise("Press-Up", .chest, bodyweight: true, share: 0.64),
 
         // Back
-        GymExercise("Deadlift", .back),
-        GymExercise("Romanian Deadlift", .back),
         GymExercise("Barbell Row", .back),
-        GymExercise("Dumbbell Row", .back),
-        GymExercise("Lat Pulldown", .back),
-        GymExercise("Seated Cable Row", .back),
-        GymExercise("Pull-Up", .back, bodyweight: true, share: 1),
         GymExercise("Chin-Up", .back, bodyweight: true, share: 1),
+        GymExercise("Deadlift", .back),
+        GymExercise("Dumbbell Row", .back),
         GymExercise("Face Pull", .back),
+        GymExercise("Inverted Row", .back, bodyweight: true, share: 0.7),
+        GymExercise("Lat Pulldown", .back),
+        GymExercise("Pull-Up", .back, bodyweight: true, share: 1),
+        GymExercise("Seated Cable Row", .back),
         GymExercise("Shrug", .back),
+        GymExercise("Straight-Arm Pulldown", .back),
+        GymExercise("T-Bar Row", .back),
 
-        // Legs
+        // Legs — the Romanian deadlift lives here rather than under Back. It is
+        // a hamstring movement, and filing it with the pulls is why nobody could
+        // find it.
         GymExercise("Back Squat", .legs),
+        GymExercise("Bulgarian Split Squat", .legs),
+        GymExercise("Calf Raise", .legs),
         GymExercise("Front Squat", .legs),
+        GymExercise("Goblet Squat", .legs),
+        GymExercise("Hack Squat", .legs),
+        GymExercise("Hip Thrust", .legs),
+        GymExercise("Leg Curl", .legs),
+        GymExercise("Leg Extension", .legs),
         GymExercise("Leg Press", .legs),
         GymExercise("Lunge", .legs),
-        GymExercise("Bulgarian Split Squat", .legs),
-        GymExercise("Leg Extension", .legs),
-        GymExercise("Leg Curl", .legs),
-        GymExercise("Hip Thrust", .legs),
-        GymExercise("Calf Raise", .legs),
+        GymExercise("Romanian Deadlift", .legs),
         GymExercise("Step-Up", .legs),
-        GymExercise("Goblet Squat", .legs),
+        GymExercise("Walking Lunge", .legs),
 
         // Shoulders
-        GymExercise("Overhead Press", .shoulders),
+        GymExercise("Arnold Press", .shoulders),
+        GymExercise("Cable Lateral Raise", .shoulders),
         GymExercise("Dumbbell Shoulder Press", .shoulders),
-        GymExercise("Lateral Raise", .shoulders),
         GymExercise("Front Raise", .shoulders),
+        GymExercise("Lateral Raise", .shoulders),
+        GymExercise("Overhead Press", .shoulders),
         GymExercise("Rear Delt Fly", .shoulders),
         GymExercise("Upright Row", .shoulders),
-        GymExercise("Arnold Press", .shoulders),
 
         // Arms
         GymExercise("Barbell Curl", .arms),
+        GymExercise("Cable Curl", .arms),
+        GymExercise("Close-Grip Bench Press", .arms),
+        GymExercise("Concentration Curl", .arms),
         GymExercise("Dumbbell Curl", .arms),
         GymExercise("Hammer Curl", .arms),
-        GymExercise("Preacher Curl", .arms),
-        GymExercise("Triceps Pushdown", .arms),
-        GymExercise("Skull Crusher", .arms),
         GymExercise("Overhead Triceps Extension", .arms),
-        GymExercise("Close-Grip Bench Press", .arms),
+        GymExercise("Preacher Curl", .arms),
+        GymExercise("Skull Crusher", .arms),
+        GymExercise("Triceps Kickback", .arms),
+        GymExercise("Triceps Pushdown", .arms),
 
         // Core
-        // A plank is a hold: nothing travels, so it earns no volume.
-        GymExercise("Plank", .core, bodyweight: true, share: 0),
-        GymExercise("Hanging Leg Raise", .core, bodyweight: true, share: 0.5),
-        GymExercise("Cable Crunch", .core),
-        GymExercise("Russian Twist", .core),
         GymExercise("Ab Wheel", .core, bodyweight: true, share: 0.6),
         GymExercise("Back Extension", .core, bodyweight: true, share: 0.45),
+        GymExercise("Cable Crunch", .core),
+        GymExercise("Dead Bug", .core, bodyweight: true, share: 0),
+        GymExercise("Hanging Leg Raise", .core, bodyweight: true, share: 0.5),
+        GymExercise("Mountain Climber", .core, bodyweight: true, share: 0.3),
+        // Planks are holds: nothing travels, so they earn no volume.
+        GymExercise("Plank", .core, bodyweight: true, share: 0),
+        GymExercise("Russian Twist", .core),
+        GymExercise("Side Plank", .core, bodyweight: true, share: 0),
+        GymExercise("Sit-Up", .core, bodyweight: true, share: 0.35),
     ]
 
     static func exercises(in group: GymMuscleGroup) -> [GymExercise] {

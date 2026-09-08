@@ -87,6 +87,12 @@ final class HealthService {
             if loaded.bodyMass > 0 {
                 GymExerciseLibrary.bodyMassKilograms = loaded.bodyMass
             }
+        } else {
+            EventLog.shared.warning(
+                "Health",
+                "Apple Health returned no readings",
+                detail: "Access is granted, but nothing came back for the requested types."
+            )
         }
         healthActivities = result.activities
 

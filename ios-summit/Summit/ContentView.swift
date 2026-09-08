@@ -288,6 +288,8 @@ struct ContentView: View {
                         BackupView()
                     case .goals:
                         DailyGoalsView()
+                    case .eventLog:
+                        EventLogView()
                     }
                 }
         }

@@ -56,6 +56,11 @@ struct SportPickerRow: View {
                 }
             }
             Spacer(minLength: 0)
+            if settings.isPinned(sport) {
+                Image(systemName: "pin.fill")
+                    .font(.system(size: 8))
+                    .foregroundStyle(sport.tint)
+            }
             if settings.isCustomized(sport) {
                 Image(systemName: "slider.horizontal.3")
                     .font(.system(size: 8))
@@ -63,6 +68,16 @@ struct SportPickerRow: View {
             }
         }
         .padding(.vertical, 1)
+        .contextMenu {
+            Button {
+                settings.togglePin(sport)
+            } label: {
+                Label(
+                    settings.isPinned(sport) ? "Unpin" : "Pin to top",
+                    systemImage: settings.isPinned(sport) ? "pin.slash" : "pin"
+                )
+            }
+        }
     }
 }
 

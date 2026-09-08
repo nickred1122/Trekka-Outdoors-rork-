@@ -508,6 +508,13 @@ struct WorkoutPagerView: View {
                 )
                 .padding(.horizontal, WatchDisplay.spacing(6))
                 .padding(.top, statusBarInset)
+            case .music:
+                // The system's own transport, so it drives whatever the athlete
+                // actually listens to — watch, phone, Music, Spotify, a podcast.
+                // Apple requires this view fill the screen with nothing added to
+                // it, so it gets no status inset and no padding of its own.
+                NowPlayingView()
+                    .focusable(false)
             }
         }
     }
@@ -648,9 +655,21 @@ struct WorkoutPagerView: View {
 
     private func perform(_ action: WatchQuickAction) {
         switch action {
-        case .pauseResume: engine.togglePause()
-        case .lap: engine.markLap()
-        case .off: break
+        case .pauseResume:
+            engine.togglePause()
+        case .lap:
+            engine.markLap()
+        case .nextScreen:
+            // Wraps round rather than stopping at the last page: a control you
+            // cannot see the end of should never quietly stop responding.
+            guard !screens.isEmpty else { return }
+            selection = (selection + 1) % screens.count
+            WKInterfaceDevice.current().play(.click)
+        case .map:
+            guard mapIsAvailable else { return }
+            openMap()
+        case .off:
+            break
         }
     }
 

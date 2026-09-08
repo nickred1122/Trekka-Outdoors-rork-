@@ -435,6 +435,11 @@ final class MapPackStore {
             return
         } catch {
             progress = .failed(error.localizedDescription)
+            EventLog.shared.failure(
+                "Offline map",
+                "Download of \(request.name) stopped after \(completed) of \(total) tiles",
+                detail: error.localizedDescription
+            )
             return
         }
 
@@ -442,6 +447,11 @@ final class MapPackStore {
         // not have rather than a download that failed.
         guard !vectorData.isEmpty || !terrainData.isEmpty else {
             progress = .failed("No map data covers that area.")
+            EventLog.shared.warning(
+                "Offline map",
+                "No map data covers \(request.name)",
+                detail: "All \(total) tiles came back empty, so the area has no coverage upstream."
+            )
             return
         }
 
@@ -460,8 +470,18 @@ final class MapPackStore {
             // Ready means the phone has it. Whether the watch has it is a
             // separate question, answered by the watch itself.
             progress = .ready
+            EventLog.shared.info(
+                "Offline map",
+                "Stored \(request.name)",
+                detail: "\(vectorData.count) map tiles, \(terrainData.count) terrain tiles."
+            )
         } catch {
             progress = .failed(error.localizedDescription)
+            EventLog.shared.failure(
+                "Offline map",
+                "Could not save \(request.name) to disk",
+                detail: error.localizedDescription
+            )
         }
     }
 
@@ -497,6 +517,11 @@ final class MapPackStore {
             // The phone still has the ground, so this is not a failure of the
             // download — say exactly that, and name the real reason.
             progress = .failed("Map saved on your phone. \(block.message)")
+            EventLog.shared.warning(
+                "Watch",
+                "\(request.name) saved on the phone but not sent to the watch",
+                detail: block.message
+            )
         }
     }
 

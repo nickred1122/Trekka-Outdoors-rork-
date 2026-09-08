@@ -16,6 +16,8 @@ import SwiftUI
 nonisolated enum WatchQuickAction: String, CaseIterable, Codable, Sendable, Identifiable {
     case pauseResume
     case lap
+    case nextScreen
+    case map
     case off
 
     var id: String { rawValue }
@@ -24,6 +26,8 @@ nonisolated enum WatchQuickAction: String, CaseIterable, Codable, Sendable, Iden
         switch self {
         case .pauseResume: "Pause / resume"
         case .lap: "Lap"
+        case .nextScreen: "Next screen"
+        case .map: "Map"
         case .off: "Off"
         }
     }
@@ -32,6 +36,8 @@ nonisolated enum WatchQuickAction: String, CaseIterable, Codable, Sendable, Iden
         switch self {
         case .pauseResume: "Stops and restarts the clock"
         case .lap: "Banks a lap and starts the next"
+        case .nextScreen: "Steps through your pages without a swipe"
+        case .map: "Opens the map, and closes it again"
         case .off: "No action button on the workout screen"
         }
     }
@@ -44,6 +50,8 @@ nonisolated enum WatchQuickAction: String, CaseIterable, Codable, Sendable, Iden
         switch self {
         case .pauseResume: isPaused ? "play.fill" : "pause.fill"
         case .lap: "flag.fill"
+        case .nextScreen: "chevron.down"
+        case .map: "map.fill"
         case .off: "circle"
         }
     }
@@ -52,6 +60,8 @@ nonisolated enum WatchQuickAction: String, CaseIterable, Codable, Sendable, Iden
         switch self {
         case .pauseResume: isPaused ? "Resume" : "Pause"
         case .lap: "Lap"
+        case .nextScreen: "Next screen"
+        case .map: "Map"
         case .off: ""
         }
     }

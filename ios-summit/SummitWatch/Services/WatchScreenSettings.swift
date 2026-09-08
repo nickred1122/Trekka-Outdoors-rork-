@@ -10,6 +10,10 @@ import SwiftUI
 final class WatchScreenSettings {
     private var screensBySport: [String: [WatchScreen]] = [:]
     private var recentSportIDs: [String] = []
+    /// Sports pinned to the top of Start, newest first. Kept apart from recents
+    /// on purpose: a pin is a deliberate choice and must not be pushed off the
+    /// list by whatever happened to be recorded last.
+    private var pinnedSportIDs: [String] = []
 
     var autoLapKilometres: Double = 1 { didSet { persist() } }
     var isAutoLapEnabled: Bool = true { didSet { persist() } }
@@ -301,6 +305,7 @@ final class WatchScreenSettings {
         }
         screensBySport = payload.screens
         recentSportIDs = payload.recents
+        pinnedSportIDs = payload.pinned ?? pinnedSportIDs
         autoLapKilometres = payload.autoLapKilometres
         isAutoLapEnabled = payload.isAutoLapEnabled
         isAutoPauseEnabled = payload.isAutoPauseEnabled
@@ -335,6 +340,25 @@ final class WatchScreenSettings {
         applyMetricStyle()
     }
 
+    // MARK: - Favourites
+
+    var pinnedSports: [WatchSport] {
+        pinnedSportIDs.compactMap(WatchSport.init(rawValue:))
+    }
+
+    func isPinned(_ sport: WatchSport) -> Bool {
+        pinnedSportIDs.contains(sport.rawValue)
+    }
+
+    func togglePin(_ sport: WatchSport) {
+        if let index = pinnedSportIDs.firstIndex(of: sport.rawValue) {
+            pinnedSportIDs.remove(at: index)
+        } else {
+            pinnedSportIDs.insert(sport.rawValue, at: 0)
+        }
+        persist()
+    }
+
     // MARK: - Recents
 
     var recentSports: [WatchSport] {
@@ -353,6 +377,7 @@ final class WatchScreenSettings {
     private struct Payload: Codable {
         var screens: [String: [WatchScreen]]
         var recents: [String]
+        var pinned: [String]?
         var autoLapKilometres: Double
         var isAutoLapEnabled: Bool
         var isAutoPauseEnabled: Bool
@@ -388,6 +413,7 @@ final class WatchScreenSettings {
               let payload = try? JSONDecoder().decode(Payload.self, from: data) else { return }
         screensBySport = payload.screens
         recentSportIDs = payload.recents
+        pinnedSportIDs = payload.pinned ?? []
         autoLapKilometres = payload.autoLapKilometres
         isAutoLapEnabled = payload.isAutoLapEnabled
         isAutoPauseEnabled = payload.isAutoPauseEnabled
@@ -426,6 +452,7 @@ final class WatchScreenSettings {
         let payload = Payload(
             screens: screensBySport,
             recents: recentSportIDs,
+            pinned: pinnedSportIDs,
             autoLapKilometres: autoLapKilometres,
             isAutoLapEnabled: isAutoLapEnabled,
             isAutoPauseEnabled: isAutoPauseEnabled,
