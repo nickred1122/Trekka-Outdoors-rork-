@@ -3,7 +3,19 @@ import SwiftUI
 struct ActivityDetailView: View {
     let activity: ActivityRecord
 
+    @Environment(RouteStore.self) private var store
+    @Environment(HealthService.self) private var health
+
     @State private var recenterToken = 0
+
+    /// What this session says, measured against the athlete's own comparable
+    /// sessions. Empty until there is enough history to say anything honest.
+    private var sessionInsights: [TrainingInsight] {
+        ActivityInsightEngine.insights(
+            for: activity,
+            history: store.activities + health.healthActivities
+        )
+    }
 
     /// One kilometre or one mile, whichever the athlete reads in.
     private var splitDistance: Double {
@@ -82,7 +94,40 @@ struct ActivityDetailView: View {
 
         ZoneBars(minutes: activity.zoneMinutes, title: "Time in zones", subtitle: "This session")
 
+        insightsCard
+
         sessionCard
+    }
+
+    /// How this session compares to the athlete's own.
+    ///
+    /// The numbers above say what happened; this says whether it was any good,
+    /// which is the question somebody actually reopens a workout to answer. Every
+    /// comparison is against their own past sessions of the same kind — there is
+    /// no population data in it.
+    @ViewBuilder
+    private var insightsCard: some View {
+        let insights = sessionInsights
+        if !insights.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                    Text("How this compares")
+                        .font(.system(.subheadline, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                    Spacer(minLength: 0)
+                }
+                InsightRows(insights: insights)
+                Text("Measured against your own \(activity.activity.title.lowercased())s, not anybody else's.")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.textPrimary.opacity(0.4))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(16)
+            .panel()
+        }
     }
 
     private var outdoorContent: some View {
@@ -132,6 +177,8 @@ struct ActivityDetailView: View {
                 }
 
                 ZoneBars(minutes: activity.zoneMinutes, title: "Time in zones", subtitle: "This session")
+
+                insightsCard
 
                 trainingEffectCard
 

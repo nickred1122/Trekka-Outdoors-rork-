@@ -929,6 +929,7 @@
 		XXADF14B13ED58FE1034E5XX /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SummitLiveActivity/SummitLiveActivity.entitlements;
 				PRODUCT_BUNDLE_IDENTIFIER = app.rork.eeq1re3rqvs8qh5xs7zq8.summitliveactivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -951,6 +952,7 @@
 		XXD685C7F9D9F02D91AD60XX /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SummitLiveActivity/SummitLiveActivity.entitlements;
 				PRODUCT_BUNDLE_IDENTIFIER = app.rork.eeq1re3rqvs8qh5xs7zq8.summitliveactivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;

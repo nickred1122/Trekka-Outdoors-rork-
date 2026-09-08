@@ -193,8 +193,7 @@ struct RoutesView: View {
                 recenterToken += 1
                 toolFeedback += 1
             }
-            mapButton(symbol: baseStyle.symbol, label: "Switch base map") {
-                baseStyle = baseStyle.next
+            MapStylePicker(selection: $baseStyle) {
                 toolFeedback += 1
             }
             if let route = selectedRoute {

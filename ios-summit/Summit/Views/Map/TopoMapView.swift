@@ -6,44 +6,71 @@ nonisolated enum MapInteractionMode: String, Sendable {
     case waypoint
 }
 
-nonisolated enum TopoBaseStyle: String, CaseIterable, Sendable {
+nonisolated enum TopoBaseStyle: String, CaseIterable, Identifiable, Sendable {
     /// Trekka's own topographic sheet, drawn from OpenStreetMap vector tiles.
-    /// The default, and the only one that can work without a signal.
+    /// The default, and the only family that can work without a signal.
     case trekka
+    /// The same cartography after dark — for night navigation, and easier on an
+    /// always-on screen than cream paper.
+    case trekkaNight
     case terrain
+    case hybrid
     case satellite
+
+    var id: String { rawValue }
 
     var symbol: String {
         switch self {
         case .trekka: "mountain.2.fill"
-        case .terrain: "square.3.layers.3d"
-        case .satellite: "globe.americas.fill"
+        case .trekkaNight: "moon.stars.fill"
+        case .terrain: "map.fill"
+        case .hybrid: "globe.americas.fill"
+        case .satellite: "globe.desk.fill"
         }
     }
 
     var title: String {
         switch self {
         case .trekka: "Topographic"
+        case .trekkaNight: "Topographic night"
         case .terrain: "Standard"
+        case .hybrid: "Satellite with labels"
         case .satellite: "Satellite"
         }
     }
 
-    var next: TopoBaseStyle {
+    var detail: String {
         switch self {
-        case .trekka: .terrain
-        case .terrain: .satellite
-        case .satellite: .trekka
+        case .trekka: "Trekka's own sheet. Works offline."
+        case .trekkaNight: "Dark topographic sheet. Works offline."
+        case .terrain: "Apple's map, with roads and places."
+        case .hybrid: "Aerial imagery with road names over it."
+        case .satellite: "Aerial imagery on its own."
         }
     }
 
-    /// The cycle offered on the route planner.
+    /// True for the styles Trekka draws itself, which are the ones that survive
+    /// losing signal. Apple's map cannot be stored for offline use by an app.
+    var worksOffline: Bool {
+        self == .trekka || self == .trekkaNight
+    }
+
+    /// The palette Trekka's renderer should use, or nil for Apple-drawn styles.
+    var palette: TopoPalette? {
+        switch self {
+        case .trekka: .paperSheet
+        case .trekkaNight: .nightSheet
+        case .terrain, .hybrid, .satellite: nil
+        }
+    }
+
+    /// The styles the route planner can offer.
     ///
     /// Editing runs on Apple's map, which cannot draw Trekka's own sheet, so the
-    /// planner skips it rather than offering a "Topographic" button that quietly
-    /// hands back the standard map.
-    var nextEditable: TopoBaseStyle {
-        self == .satellite ? .terrain : .satellite
+    /// planner lists only those rather than offering a "Topographic" button that
+    /// quietly hands back the standard map.
+    static var editableCases: [TopoBaseStyle] {
+        [.terrain, .hybrid, .satellite]
     }
 }
 
@@ -105,9 +132,7 @@ struct TopoMapView: UIViewRepresentable {
         mapView.showsUserLocation = showsUserLocation
         if context.coordinator.appliedBaseStyle != baseStyle {
             context.coordinator.appliedBaseStyle = baseStyle
-            mapView.preferredConfiguration = baseStyle == .satellite
-                ? MKHybridMapConfiguration(elevationStyle: .realistic)
-                : MKStandardMapConfiguration(elevationStyle: .realistic, emphasisStyle: .muted)
+            mapView.preferredConfiguration = Self.configuration(for: baseStyle)
             mapView.pointOfInterestFilter = .excludingAll
         }
         mapView.isScrollEnabled = isInteractive
@@ -136,6 +161,19 @@ struct TopoMapView: UIViewRepresentable {
             } else if !routePoints.isEmpty {
                 context.coordinator.frame(points: routePoints, animated: true)
             }
+        }
+    }
+
+    /// Apple's map configuration for each Apple-drawn style. Trekka's own sheets
+    /// never reach this view, so they fall back to the standard map.
+    static func configuration(for style: TopoBaseStyle) -> MKMapConfiguration {
+        switch style {
+        case .hybrid:
+            MKHybridMapConfiguration(elevationStyle: .realistic)
+        case .satellite:
+            MKImageryMapConfiguration(elevationStyle: .realistic)
+        case .terrain, .trekka, .trekkaNight:
+            MKStandardMapConfiguration(elevationStyle: .realistic, emphasisStyle: .muted)
         }
     }
 

@@ -2,11 +2,12 @@ import SwiftUI
 
 /// Every root screen reachable from the bottom bar. Adding a screen is one case
 /// here plus one entry in `ContentView`.
-nonisolated enum AppTab: String, CaseIterable, Identifiable, Hashable, Sendable {
+nonisolated enum AppTab: String, CaseIterable, Identifiable, Hashable, Codable, Sendable {
     case today
     case routes
     case calendar
     case activities
+    case insights
     case fuel
     case settings
 
@@ -18,6 +19,7 @@ nonisolated enum AppTab: String, CaseIterable, Identifiable, Hashable, Sendable 
         case .routes: "Routes"
         case .calendar: "Calendar"
         case .activities: "Log"
+        case .insights: "Insights"
         case .fuel: "Fuel"
         case .settings: "Settings"
         }
@@ -29,6 +31,7 @@ nonisolated enum AppTab: String, CaseIterable, Identifiable, Hashable, Sendable 
         case .routes: "map.fill"
         case .calendar: "calendar"
         case .activities: "waveform.path.ecg"
+        case .insights: "sparkles"
         case .fuel: "fork.knife"
         case .settings: "gearshape.fill"
         }
@@ -47,6 +50,8 @@ nonisolated enum TabBarMetrics {
 /// The app's fixed bottom bar: one solid slab the content scrolls underneath.
 struct SummitTabBar: View {
     @Binding var selection: AppTab
+    /// The screens this athlete chose to keep in the bar, in their order.
+    var tabs: [AppTab]
     var onReselect: (AppTab) -> Void
 
     @Namespace private var indicator
@@ -54,7 +59,7 @@ struct SummitTabBar: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            ForEach(AppTab.allCases) { tab in
+            ForEach(tabs) { tab in
                 item(for: tab)
             }
         }

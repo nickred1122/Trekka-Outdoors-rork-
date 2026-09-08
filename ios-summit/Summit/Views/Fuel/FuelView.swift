@@ -12,6 +12,11 @@ struct FuelView: View {
     @State private var date: Date = .now
     @State private var addingMeal: Meal?
     @State private var isEditingGoals = false
+    /// The meal a bare calorie figure is being typed against.
+    @State private var quickAddMeal: Meal?
+    @State private var quickAddText = ""
+    @State private var feedback = 0
+    @State private var notice: String?
 
     private var day: DayNutrition { nutrition.day(date) }
     private var goals: NutritionGoals { nutrition.goals }
@@ -44,9 +49,21 @@ struct FuelView: View {
                 dateBar
                 summaryCard
 
+                if let notice {
+                    noticeCard(notice)
+                }
+
+                if day.isEmpty, let source = nutrition.lastLoggedDay(before: date) {
+                    copyDayCard(from: source)
+                }
+
                 ForEach(Meal.allCases) { meal in
                     mealCard(meal)
                 }
+
+                waterCard
+
+                weekCard
 
                 footnote
             }
@@ -72,6 +89,101 @@ struct FuelView: View {
         .sheet(isPresented: $isEditingGoals) {
             NutritionGoalsView()
         }
+        .sensoryFeedback(.success, trigger: feedback)
+        .animation(.snappy(duration: 0.28), value: notice)
+        .alert("Quick add", isPresented: quickAddBinding) {
+            TextField("Calories", text: $quickAddText)
+                .keyboardType(.numberPad)
+            Button("Add") { commitQuickAdd() }
+            Button("Cancel", role: .cancel) { quickAddMeal = nil }
+        } message: {
+            Text("For a meal you know the calories of but not the ingredients. Logged as energy only \u{2014} no invented macros.")
+        }
+    }
+
+    private var quickAddBinding: Binding<Bool> {
+        Binding(
+            get: { quickAddMeal != nil },
+            set: { if !$0 { quickAddMeal = nil } }
+        )
+    }
+
+    private func commitQuickAdd() {
+        defer {
+            quickAddMeal = nil
+            quickAddText = ""
+        }
+        guard let meal = quickAddMeal,
+              let value = Double(quickAddText.trimmingCharacters(in: .whitespaces)),
+              value > 0 else { return }
+        nutrition.quickAdd(kilocalories: value, meal: meal, date: date)
+        feedback += 1
+    }
+
+    private func noticeCard(_ text: String) -> some View {
+        HStack(spacing: 9) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.positive)
+            Text(text)
+                .font(.caption)
+                .foregroundStyle(Theme.textPrimary.opacity(0.75))
+            Spacer(minLength: 0)
+            Button {
+                notice = nil
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Theme.textPrimary.opacity(0.4))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(12)
+        .panel()
+        .transition(.opacity.combined(with: .move(edge: .top)))
+    }
+
+    /// Copying a day forward, offered only when today is still empty.
+    ///
+    /// Anybody who eats roughly the same thing daily was re-logging every item
+    /// every morning. The source is the last day actually logged rather than
+    /// literally yesterday, so a skipped day does not offer to copy nothing.
+    private func copyDayCard(from source: Date) -> some View {
+        Button {
+            let copied = nutrition.copyDay(from: source, to: date)
+            guard copied > 0 else { return }
+            notice = "Copied \(copied) \(copied == 1 ? "item" : "items") from \(sourceLabel(source))."
+            feedback += 1
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "doc.on.doc.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 32, height: 32)
+                    .background(Theme.accent.opacity(0.12), in: .rect(cornerRadius: 9))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Copy \(sourceLabel(source))")
+                        .font(.system(.subheadline, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text("Brings that day's food across, ready to edit")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textPrimary.opacity(0.55))
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.textPrimary.opacity(0.3))
+            }
+            .padding(12)
+            .panel()
+        }
+        .buttonStyle(TilePressStyle())
+    }
+
+    private func sourceLabel(_ source: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInYesterday(source) { return "yesterday" }
+        return source.formatted(.dateTime.weekday(.wide)).lowercased()
     }
 
     // MARK: - Date
@@ -233,24 +345,217 @@ struct FuelView: View {
                 entryRow(entry)
             }
 
-            Button {
-                addingMeal = meal
-            } label: {
-                HStack(spacing: 7) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                    Text("Add food")
-                        .font(.system(.subheadline, weight: .semibold))
-                    Spacer(minLength: 0)
+            HStack(spacing: 0) {
+                Button {
+                    addingMeal = meal
+                } label: {
+                    HStack(spacing: 7) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Add food")
+                            .font(.system(.subheadline, weight: .semibold))
+                        Spacer(minLength: 0)
+                    }
+                    .foregroundStyle(Theme.accent)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 11)
+                    .contentShape(.rect)
                 }
-                .foregroundStyle(Theme.accent)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 11)
-                .contentShape(.rect)
+                .buttonStyle(.plain)
+
+                Menu {
+                    Button {
+                        quickAddText = ""
+                        quickAddMeal = meal
+                    } label: {
+                        Label("Quick add calories", systemImage: "number")
+                    }
+                    if let source = nutrition.lastLoggedDay(before: date),
+                       !nutrition.day(source).entries(for: meal).isEmpty {
+                        Button {
+                            let copied = nutrition.copy(meal: meal, from: source, to: date)
+                            guard copied > 0 else { return }
+                            notice = "Copied \(meal.title.lowercased()) from \(sourceLabel(source))."
+                            feedback += 1
+                        } label: {
+                            Label("Copy from \(sourceLabel(source))", systemImage: "doc.on.doc")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary.opacity(0.45))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 11)
+                        .contentShape(.rect)
+                }
+                .accessibilityLabel("More ways to log \(meal.title.lowercased())")
             }
-            .buttonStyle(.plain)
         }
         .panel(radius: 14)
+    }
+
+    // MARK: - Water
+
+    /// Drinking, in one tap.
+    ///
+    /// Kept out of the food diary because water carries no energy and no macros:
+    /// filing it as food would put rows against meals that contribute nothing to
+    /// any total.
+    private var waterCard: some View {
+        let logged = nutrition.water(date).millilitres
+        let target: Double = 2_000
+
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "drop.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.zoneColors[3])
+                    .frame(width: 26, height: 26)
+                    .background(Theme.zoneColors[3].opacity(0.14), in: .rect(cornerRadius: 8))
+                Text("Water")
+                    .font(.system(.subheadline, weight: .bold))
+                    .foregroundStyle(Theme.textPrimary)
+                Spacer(minLength: 0)
+                Text(waterLabel(logged))
+                    .font(.metric(14))
+                    .foregroundStyle(Theme.textPrimary)
+                    .contentTransition(.numericText())
+            }
+
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Theme.surfaceRaised)
+                    Capsule()
+                        .fill(Theme.zoneColors[3])
+                        .frame(width: max(logged > 0 ? 6 : 0, geometry.size.width * min(1, logged / target)))
+                }
+            }
+            .frame(height: 6)
+
+            HStack(spacing: 8) {
+                ForEach(WaterMeasure.allCases) { measure in
+                    Button {
+                        nutrition.addWater(millilitres: measure.millilitres, date: date)
+                        feedback += 1
+                    } label: {
+                        VStack(spacing: 3) {
+                            Image(systemName: measure.symbol)
+                                .font(.system(size: 13, weight: .semibold))
+                            Text(measure.title)
+                                .font(.system(size: 10, weight: .semibold))
+                        }
+                        .foregroundStyle(Theme.zoneColors[3])
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(Theme.surfaceRaised, in: .rect(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Add a \(measure.title.lowercased()) of water")
+                }
+
+                Button {
+                    nutrition.removeLastWater(on: date)
+                    feedback += 1
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary.opacity(logged > 0 ? 0.6 : 0.25))
+                        .frame(width: 40)
+                        .padding(.vertical, 13)
+                        .background(Theme.surfaceRaised, in: .rect(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+                .disabled(logged <= 0)
+                .accessibilityLabel("Undo the last drink")
+            }
+        }
+        .padding(14)
+        .panel()
+    }
+
+    /// Litres once there is a litre to speak of, millilitres below that.
+    private func waterLabel(_ millilitres: Double) -> String {
+        guard millilitres >= 1_000 else { return "\(Int(millilitres.rounded())) ml" }
+        return String(format: "%.1f L", millilitres / 1_000)
+    }
+
+    // MARK: - Week
+
+    /// The week, which is the scale eating actually happens on.
+    ///
+    /// A single day over target means nothing; four of them in a row is the
+    /// thing worth knowing. Only days with something logged count — averaging in
+    /// the days somebody forgot to open the app would report a starvation diet.
+    @ViewBuilder
+    private var weekCard: some View {
+        let week = nutrition.weekSummary(endingOn: date)
+        if week.loggedDayCount >= 2 {
+            let onTarget = week.daysOnTarget(target)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                        .frame(width: 26, height: 26)
+                        .background(Theme.accent.opacity(0.12), in: .rect(cornerRadius: 8))
+                    Text("This week")
+                        .font(.system(.subheadline, weight: .bold))
+                        .foregroundStyle(Theme.textPrimary)
+                    Spacer(minLength: 0)
+                    Text("\(week.loggedDayCount) \(week.loggedDayCount == 1 ? "day" : "days") logged")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.textPrimary.opacity(0.45))
+                }
+
+                HStack(spacing: 10) {
+                    weekStat("Average", "\(Int(week.averageEnergy.rounded()))", "kcal")
+                    weekStat("Protein", "\(Int(week.averageProtein.rounded()))", "g avg")
+                    weekStat("On target", "\(onTarget)", "of \(week.loggedDayCount)")
+                }
+
+                Text(weekVerdict(week, onTarget: onTarget))
+                    .font(.caption)
+                    .foregroundStyle(Theme.textPrimary.opacity(0.6))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(14)
+            .panel()
+        }
+    }
+
+    private func weekStat(_ label: String, _ value: String, _ unit: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(label.uppercased())
+                .font(.system(size: 9, weight: .bold))
+                .kerning(0.5)
+                .foregroundStyle(Theme.textPrimary.opacity(0.45))
+            Text(value)
+                .font(.metric(18))
+                .foregroundStyle(Theme.textPrimary)
+            Text(unit)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(Theme.textPrimary.opacity(0.45))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Theme.surfaceRaised, in: .rect(cornerRadius: 10))
+    }
+
+    private func weekVerdict(_ week: NutritionWeek, onTarget: Int) -> String {
+        guard target > 0 else { return "Set a daily target to see how the week compares." }
+        let over = week.daysOver(target)
+        let under = week.daysUnder(target)
+        if onTarget == week.loggedDayCount {
+            return "Every logged day inside a tenth of your target. That is the hard part done."
+        }
+        if over > under {
+            return "\(over) \(over == 1 ? "day" : "days") over target, averaging \(Int((week.averageEnergy - target).rounded())) kcal above it."
+        }
+        if under > over {
+            return "\(under) \(under == 1 ? "day" : "days") under target. Worth checking on a heavy training week."
+        }
+        return "An even split of days above and below your target."
     }
 
     private func entryRow(_ entry: FoodEntry) -> some View {

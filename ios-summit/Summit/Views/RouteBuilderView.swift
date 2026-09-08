@@ -157,8 +157,7 @@ struct RouteBuilderView: View {
                 recenterToken += 1
                 feedback += 1
             }
-            mapButton(symbol: baseStyle.symbol, label: "Switch base map") {
-                baseStyle = baseStyle.nextEditable
+            MapStylePicker(selection: $baseStyle, styles: TopoBaseStyle.editableCases) {
                 feedback += 1
             }
             mapButton(

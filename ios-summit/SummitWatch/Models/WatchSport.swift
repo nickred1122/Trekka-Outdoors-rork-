@@ -72,14 +72,19 @@ nonisolated enum SportFamily: String, Codable, CaseIterable, Sendable, Identifia
 /// Every activity the watch can record, each with its own screen defaults.
 nonisolated enum WatchSport: String, Codable, CaseIterable, Identifiable, Sendable {
     case trailRun, roadRun, ultraRun, track, treadmill, virtualRun
-    case ride, gravelRide, mountainBike, bikepacking, eBike, commute, indoorRide
+    case ride, gravelRide, mountainBike, bikepacking, eBike, commute, indoorRide, handCycling
     case hike, walk, ruck, backpacking, mountaineering
     case rockClimb, boulder, indoorClimb, viaFerrata
     case backcountrySki, alpineSki, snowboard, splitboard, nordicSki, snowshoe, iceSkate
     case openWaterSwim, poolSwim, kayak, paddleboard, surf, sail
     case strength, hiit, yoga, pilates, cardio, elliptical, stairStepper, row
+    case jumpRope, stretching, barre, taiChi, coreTraining, danceFitness
+    case boxing, kickboxing, martialArts, climbStairs
     case soccer, basketball, tennis, pickleball, golf, discGolf
+    case volleyball, badminton, tableTennis, squash, racquetball
+    case baseball, softball, americanFootball, hockey, rugby, cricket, lacrosse, bowling
     case skateboard, horseback, hunt, fish
+    case lawnMowing, yardWork, snowShoveling, other
 
     var id: String { rawValue }
 
@@ -98,6 +103,7 @@ nonisolated enum WatchSport: String, Codable, CaseIterable, Identifiable, Sendab
         case .eBike: "E-Bike"
         case .commute: "Commute"
         case .indoorRide: "Indoor Ride"
+        case .handCycling: "Hand Cycling"
         case .hike: "Hike"
         case .walk: "Walk"
         case .ruck: "Ruck"
@@ -128,16 +134,43 @@ nonisolated enum WatchSport: String, Codable, CaseIterable, Identifiable, Sendab
         case .elliptical: "Elliptical"
         case .stairStepper: "Stair Stepper"
         case .row: "Indoor Row"
+        case .jumpRope: "Jump Rope"
+        case .stretching: "Stretching"
+        case .barre: "Barre"
+        case .taiChi: "Tai Chi"
+        case .coreTraining: "Core Training"
+        case .danceFitness: "Dance Fitness"
+        case .boxing: "Boxing"
+        case .kickboxing: "Kickboxing"
+        case .martialArts: "Martial Arts"
+        case .climbStairs: "Stair Climbing"
         case .soccer: "Soccer"
         case .basketball: "Basketball"
         case .tennis: "Tennis"
         case .pickleball: "Pickleball"
         case .golf: "Golf"
         case .discGolf: "Disc Golf"
+        case .volleyball: "Volleyball"
+        case .badminton: "Badminton"
+        case .tableTennis: "Table Tennis"
+        case .squash: "Squash"
+        case .racquetball: "Racquetball"
+        case .baseball: "Baseball"
+        case .softball: "Softball"
+        case .americanFootball: "Football"
+        case .hockey: "Hockey"
+        case .rugby: "Rugby"
+        case .cricket: "Cricket"
+        case .lacrosse: "Lacrosse"
+        case .bowling: "Bowling"
         case .skateboard: "Skateboard"
         case .horseback: "Horse Riding"
         case .hunt: "Hunt"
         case .fish: "Fish"
+        case .lawnMowing: "Lawn Mowing"
+        case .yardWork: "Yard Work"
+        case .snowShoveling: "Snow Shoveling"
+        case .other: "Other"
         }
     }
 
@@ -155,6 +188,7 @@ nonisolated enum WatchSport: String, Codable, CaseIterable, Identifiable, Sendab
         case .eBike: "bolt.circle.fill"
         case .commute: "road.lanes"
         case .indoorRide: "figure.indoor.cycle"
+        case .handCycling: "figure.hand.cycling"
         case .hike: "figure.hiking"
         case .walk: "figure.walk"
         case .ruck: "backpack.fill"
@@ -184,30 +218,64 @@ nonisolated enum WatchSport: String, Codable, CaseIterable, Identifiable, Sendab
         case .elliptical: "figure.elliptical"
         case .stairStepper: "figure.stair.stepper"
         case .row: "figure.indoor.rowing"
+        case .jumpRope: "figure.jumprope"
+        case .stretching: "figure.flexibility"
+        case .barre: "figure.barre"
+        case .taiChi: "figure.taichi"
+        case .coreTraining: "figure.core.training"
+        case .danceFitness: "figure.dance"
+        case .boxing: "figure.boxing"
+        case .kickboxing: "figure.kickboxing"
+        case .martialArts: "figure.martial.arts"
+        case .climbStairs: "figure.stairs"
         case .soccer: "figure.outdoor.soccer"
         case .basketball: "figure.basketball"
         case .tennis: "figure.tennis"
         case .pickleball: "figure.pickleball"
         case .golf: "figure.golf"
         case .discGolf: "figure.disc.sports"
+        case .volleyball: "figure.volleyball"
+        case .badminton: "figure.badminton"
+        case .tableTennis: "figure.table.tennis"
+        case .squash: "figure.squash"
+        case .racquetball: "figure.racquetball"
+        case .baseball: "figure.baseball"
+        case .softball: "figure.softball"
+        case .americanFootball: "figure.american.football"
+        case .hockey: "figure.hockey"
+        case .rugby: "figure.rugby"
+        case .cricket: "figure.cricket"
+        case .lacrosse: "figure.lacrosse"
+        case .bowling: "figure.bowling"
         case .skateboard: "figure.skateboarding"
         case .horseback: "figure.equestrian.sports"
         case .hunt: "figure.hunting"
         case .fish: "figure.fishing"
+        case .lawnMowing: "leaf.fill"
+        case .yardWork: "hammer.fill"
+        case .snowShoveling: "snowflake.circle.fill"
+        case .other: "figure.mixed.cardio"
         }
     }
 
     var family: SportFamily {
         switch self {
         case .trailRun, .roadRun, .ultraRun, .track, .treadmill, .virtualRun: .run
-        case .ride, .gravelRide, .mountainBike, .bikepacking, .eBike, .commute, .indoorRide: .ride
+        case .ride, .gravelRide, .mountainBike, .bikepacking, .eBike, .commute,
+             .indoorRide, .handCycling: .ride
         case .hike, .walk, .ruck, .backpacking, .mountaineering: .hike
         case .rockClimb, .boulder, .indoorClimb, .viaFerrata: .climb
         case .backcountrySki, .alpineSki, .snowboard, .splitboard, .nordicSki, .snowshoe, .iceSkate: .snow
         case .openWaterSwim, .poolSwim, .kayak, .paddleboard, .surf, .sail: .water
-        case .strength, .hiit, .yoga, .pilates, .cardio, .elliptical, .stairStepper, .row: .gym
-        case .soccer, .basketball, .tennis, .pickleball, .golf, .discGolf: .sport
-        case .skateboard, .horseback, .hunt, .fish: .other
+        case .strength, .hiit, .yoga, .pilates, .cardio, .elliptical, .stairStepper,
+             .row, .jumpRope, .stretching, .barre, .taiChi, .coreTraining,
+             .danceFitness, .boxing, .kickboxing, .martialArts, .climbStairs: .gym
+        case .soccer, .basketball, .tennis, .pickleball, .golf, .discGolf,
+             .volleyball, .badminton, .tableTennis, .squash, .racquetball,
+             .baseball, .softball, .americanFootball, .hockey, .rugby, .cricket,
+             .lacrosse, .bowling: .sport
+        case .skateboard, .horseback, .hunt, .fish, .lawnMowing, .yardWork,
+             .snowShoveling, .other: .other
         }
     }
 
@@ -215,9 +283,12 @@ nonisolated enum WatchSport: String, Codable, CaseIterable, Identifiable, Sendab
 
     var isIndoor: Bool {
         switch self {
-        case .treadmill, .virtualRun, .indoorRide, .boulder, .indoorClimb, .poolSwim,
-             .strength, .hiit, .yoga, .pilates, .cardio, .elliptical, .stairStepper, .row,
-             .soccer, .basketball, .tennis, .pickleball:
+        case .treadmill, .virtualRun, .indoorRide, .handCycling, .boulder, .indoorClimb,
+             .poolSwim, .strength, .hiit, .yoga, .pilates, .cardio, .elliptical,
+             .stairStepper, .row, .jumpRope, .stretching, .barre, .taiChi,
+             .coreTraining, .danceFitness, .boxing, .kickboxing, .martialArts,
+             .climbStairs, .soccer, .basketball, .tennis, .pickleball, .volleyball,
+             .badminton, .tableTennis, .squash, .racquetball, .bowling:
             true
         default:
             false
@@ -268,6 +339,7 @@ nonisolated enum WatchSport: String, Codable, CaseIterable, Identifiable, Sendab
         case .bikepacking: 4.2
         case .eBike: 6.5
         case .commute: 5.0
+        case .handCycling: 4.0
         case .hike: 1.3
         case .walk: 1.4
         case .ruck: 1.2
@@ -287,13 +359,20 @@ nonisolated enum WatchSport: String, Codable, CaseIterable, Identifiable, Sendab
         case .paddleboard: 1.4
         case .surf: 0.6
         case .sail: 3.5
-        case .strength, .hiit, .yoga, .pilates, .cardio, .elliptical, .stairStepper, .row: 0
-        case .soccer, .basketball, .tennis, .pickleball: 0
+        case .strength, .hiit, .yoga, .pilates, .cardio, .elliptical, .stairStepper,
+             .row, .jumpRope, .stretching, .barre, .taiChi, .coreTraining,
+             .danceFitness, .boxing, .kickboxing, .martialArts, .climbStairs: 0
+        case .soccer, .basketball, .tennis, .pickleball, .volleyball, .badminton,
+             .tableTennis, .squash, .racquetball, .baseball, .softball,
+             .americanFootball, .hockey, .rugby, .cricket, .lacrosse, .bowling: 0
         case .golf, .discGolf: 1.0
         case .skateboard: 3.5
         case .horseback: 2.5
         case .hunt: 0.7
         case .fish: 0.3
+        case .lawnMowing, .yardWork: 0.5
+        case .snowShoveling: 0.3
+        case .other: 0
         }
     }
 
@@ -547,13 +626,36 @@ nonisolated enum WatchSport: String, Codable, CaseIterable, Identifiable, Sendab
                 .data([.duration, .heartRate]),
                 .data([.calories, .averageHeartRate, .timeOfDay, .heartRateZone]),
             ]
-        case .cardio, .elliptical, .stairStepper:
+        case .cardio, .elliptical, .stairStepper, .danceFitness, .jumpRope, .climbStairs:
             [
                 .data([.duration, .heartRate, .calories]),
                 .data([.averageHeartRate, .maxHeartRate, .heartRateZone, .trainingEffect]),
                 .page(.zones),
             ]
-        case .soccer, .basketball, .tennis, .pickleball:
+        case .stretching, .barre, .taiChi:
+            [
+                .data([.duration, .heartRate]),
+                .data([.calories, .averageHeartRate, .timeOfDay, .heartRateZone]),
+            ]
+        case .coreTraining:
+            [
+                // Sets first, as with strength: in the middle of a circuit the
+                // logger is the screen actually in use.
+                .page(.sets),
+                .data([.duration, .heartRate, .calories, .heartRateZone]),
+                .page(.zones),
+            ]
+        case .boxing, .kickboxing, .martialArts:
+            [
+                // Rounds are laps, which is how a fighter already counts them.
+                .data([.duration, .heartRate, .heartRateZone]),
+                .data([.lapTime, .lapCount, .averageHeartRate, .maxHeartRate]),
+                .page(.laps),
+                .page(.zones),
+            ]
+        case .soccer, .basketball, .tennis, .pickleball, .volleyball, .badminton,
+             .tableTennis, .squash, .racquetball, .baseball, .softball,
+             .americanFootball, .hockey, .rugby, .cricket, .lacrosse, .bowling:
             [
                 .data([.duration, .heartRate, .calories]),
                 .data([.averageHeartRate, .maxHeartRate, .heartRateZone, .timeOfDay]),
@@ -585,6 +687,23 @@ nonisolated enum WatchSport: String, Codable, CaseIterable, Identifiable, Sendab
                 .page(.map),
                 .page(.compass),
                 .data([.eta, .remainingDistance, .distanceToWaypoint, .nextWaypoint]),
+            ]
+        case .handCycling:
+            [
+                .data([.duration, .distance, .speed, .heartRate]),
+                .data([.averageSpeed, .calories, .averageHeartRate, .heartRateZone]),
+                .page(.zones),
+            ]
+        case .lawnMowing, .yardWork, .snowShoveling:
+            [
+                .data([.duration, .heartRate, .calories]),
+                .data([.averageHeartRate, .steps, .timeOfDay, .heartRateZone]),
+            ]
+        case .other:
+            [
+                .data([.duration, .heartRate, .calories]),
+                .data([.distance, .averageHeartRate, .timeOfDay, .heartRateZone]),
+                .page(.map),
             ]
         }
     }

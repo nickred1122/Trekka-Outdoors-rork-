@@ -118,14 +118,47 @@ final class TopoMapModel {
         }
     }
 
+    /// Loads the ground a drag is heading towards, without moving the camera.
+    ///
+    /// A pan used to fetch nothing until the finger came up, because the camera
+    /// does not move until then — the gesture shifts what is already drawn. Drag
+    /// further than a screen and you were pulling blank paper across the view and
+    /// waiting for it to fill in after you stopped. This asks for the tiles under
+    /// where the view *currently is*, so ground arrives while the finger is still
+    /// down.
+    ///
+    /// `offset` is the live drag translation in screen points: the content has
+    /// moved that way, so the camera is effectively looking the other way.
+    func prefetch(size: CGSize, offset: CGSize) {
+        guard size.width > 1, size.height > 1 else { return }
+        let shift = CGSize(width: -offset.width, height: -offset.height)
+
+        let vectorZoom = camera.tileZoom(maximum: TopoTileSource.maximumVectorZoom)
+        for key in visibleKeys(size: size, zoom: vectorZoom, shift: shift) where drawTiles[key] == nil {
+            load(key)
+        }
+
+        if showsContours {
+            let contourZoom = min(vectorZoom, ContourBuilder.maximumZoom)
+            for key in visibleKeys(size: size, zoom: contourZoom, shift: shift)
+            where contourDrawTiles[key] == nil {
+                loadContour(key)
+            }
+        }
+    }
+
     /// Tiles covering the view.
     ///
     /// The bounding circle is used rather than the exact rectangle so the answer
     /// stays right when the map is rotated to a heading — it fetches a little
     /// extra at the corners in exchange for not recomputing on every degree.
-    private func visibleKeys(size: CGSize, zoom: Int) -> [TopoTileKey] {
+    private func visibleKeys(size: CGSize, zoom: Int, shift: CGSize = .zero) -> [TopoTileKey] {
         let worldSize: Double = TopoTileMath.worldSize(zoom: camera.zoom)
-        let centreWorld = camera.centreWorldPixels
+        let unshifted = camera.centreWorldPixels
+        let centreWorld = CGPoint(
+            x: unshifted.x + shift.width,
+            y: unshifted.y + shift.height
+        )
         let radius: Double = hypot(Double(size.width), Double(size.height)) / 2
 
         let minX: Double = (Double(centreWorld.x) - radius) / worldSize

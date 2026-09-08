@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var health = HealthService()
     @State private var watchSync = WatchSyncService()
     @State private var dashboardSettings = DashboardSettings()
+    @State private var tabBarSettings = TabBarSettings()
     @State private var watchLayout = WatchLayoutStore()
     @State private var appearance = AppearanceSettings()
     @State private var units = UnitSettings()
@@ -25,6 +26,7 @@ struct ContentView: View {
     @State private var routesPath = NavigationPath()
     @State private var calendarPath = NavigationPath()
     @State private var activitiesPath = NavigationPath()
+    @State private var insightsPath = NavigationPath()
     @State private var fuelPath = NavigationPath()
     @State private var settingsPath = NavigationPath()
 
@@ -38,6 +40,7 @@ struct ContentView: View {
         case .routes: routesPath.isEmpty
         case .calendar: calendarPath.isEmpty
         case .activities: activitiesPath.isEmpty
+        case .insights: insightsPath.isEmpty
         case .fuel: fuelPath.isEmpty
         case .settings: settingsPath.isEmpty
         }
@@ -51,13 +54,18 @@ struct ContentView: View {
             TabScreen(tab: .routes, selection: selectedTab) { routesScreen }
             TabScreen(tab: .calendar, selection: selectedTab) { calendarScreen }
             TabScreen(tab: .activities, selection: selectedTab) { activitiesScreen }
+            TabScreen(tab: .insights, selection: selectedTab) { insightsScreen }
             TabScreen(tab: .fuel, selection: selectedTab) { fuelScreen }
             TabScreen(tab: .settings, selection: selectedTab) { settingsScreen }
 
             if showsTabBar {
                 VStack(spacing: 0) {
                     TabBarFade()
-                    SummitTabBar(selection: $selectedTab, onReselect: popToRoot)
+                    SummitTabBar(
+                        selection: $selectedTab,
+                        tabs: tabBarSettings.visibleTabs,
+                        onReselect: popToRoot
+                    )
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -75,6 +83,7 @@ struct ContentView: View {
         .environment(health)
         .environment(watchSync)
         .environment(dashboardSettings)
+        .environment(tabBarSettings)
         .environment(watchLayout)
         .environment(appearance)
         .environment(units)
@@ -127,8 +136,14 @@ struct ContentView: View {
             watchLink.activate()
 
             // A goal is part of the dashboard, so the wrist hears about it the
-            // moment it changes rather than at the next launch.
-            goalSettings.onChange = { pushDashboard() }
+            // moment it changes rather than at the next launch. A sleep goal
+            // also feeds readiness, which measures the night against the
+            // athlete's own target rather than a flat eight hours.
+            goalSettings.onChange = {
+                health.sleepGoalHours = goalSettings.snapshot.target(for: .sleep)
+                pushDashboard()
+            }
+            health.sleepGoalHours = goalSettings.snapshot.target(for: .sleep)
 
             // The watch reads its units out of the layout document, so the two
             // devices are brought into line at launch rather than drifting until
@@ -202,6 +217,12 @@ struct ContentView: View {
         .onChange(of: store.activities.count) { _, _ in
             pushDashboard()
         }
+        // Switching off the screen you are standing on would otherwise leave the
+        // app showing a tab with nothing in the bar selected.
+        .onChange(of: tabBarSettings.visibleTabs) { _, visible in
+            guard !visible.contains(selectedTab), let first = visible.first else { return }
+            withAnimation(.snappy(duration: 0.26)) { selectedTab = first }
+        }
     }
 
     /// What, if anything, stands between launch and the app.
@@ -265,6 +286,16 @@ struct ContentView: View {
         }
     }
 
+    private var insightsScreen: some View {
+        NavigationStack(path: $insightsPath) {
+            InsightsView()
+                .navigationTitle("Insights")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarBackground(Theme.canvas, for: .navigationBar)
+                .navigationDestination(for: ActivityRecord.self) { ActivityDetailView(activity: $0) }
+        }
+    }
+
     private var fuelScreen: some View {
         NavigationStack(path: $fuelPath) {
             FuelView()
@@ -290,6 +321,8 @@ struct ContentView: View {
                         DailyGoalsView()
                     case .eventLog:
                         EventLogView()
+                    case .tabBar:
+                        TabBarEditorView()
                     }
                 }
         }
@@ -319,6 +352,7 @@ struct ContentView: View {
             case .routes: routesPath = NavigationPath()
             case .calendar: calendarPath = NavigationPath()
             case .activities: activitiesPath = NavigationPath()
+            case .insights: insightsPath = NavigationPath()
             case .fuel: fuelPath = NavigationPath()
             case .settings: settingsPath = NavigationPath()
             }
@@ -340,6 +374,47 @@ struct ContentView: View {
     private func pushEverything() {
         pushDashboard()
         watchLayout.pushSilently()
+        publishInsights()
+    }
+
+    /// Hands the home-screen widget the observations the app has already worked
+    /// out, worded and in the athlete's own units.
+    ///
+    /// Done here rather than in the insights screen so the widget is fed whether
+    /// or not that screen has been opened — a widget that only updates once you
+    /// look at the app is worse than no widget.
+    private func publishInsights() {
+        let activities = (store.activities + health.healthActivities)
+            .sorted { $0.startDate > $1.startDate }
+        let insights = InsightEngine.insights(
+            activities: activities,
+            snapshot: health.snapshot,
+            day: nutrition.day(Date()),
+            fuelGoals: nutrition.goals,
+            dailyGoals: goalSettings.snapshot
+        )
+
+        guard !insights.isEmpty else {
+            InsightFace.clear()
+            return
+        }
+
+        let lines: [InsightFace.Line] = insights.prefix(3).map { insight in
+            let tone: InsightFace.Tone = switch insight.tone {
+            case .positive: .positive
+            case .neutral: .neutral
+            case .caution: .caution
+            }
+            return InsightFace.Line(
+                id: insight.id,
+                title: insight.title,
+                detail: insight.detail,
+                symbol: insight.symbol,
+                tone: tone
+            )
+        }
+
+        InsightFace.save(InsightFace.Snapshot(lines: lines, updatedAt: Date()))
     }
 
     /// Sends the latest body mass to the wrist so bodyweight gym sets are scored

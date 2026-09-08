@@ -3,9 +3,19 @@ import SwiftUI
 /// Explains exactly how today's readiness score was assembled.
 struct ReadinessDetailView: View {
     @Environment(HealthService.self) private var health
+    @Environment(GoalSettings.self) private var goals
 
     private var snapshot: HealthSnapshot { health.snapshot }
-    private var factors: [ReadinessFactor] { ReadinessCalculator.factors(for: snapshot) }
+
+    /// The athlete's own nightly target, so the breakdown measures sleep against
+    /// the same figure the score did.
+    private var sleepGoalHours: Double? {
+        goals.snapshot.target(for: .sleep)
+    }
+
+    private var factors: [ReadinessFactor] {
+        ReadinessCalculator.factors(for: snapshot, sleepGoalHours: sleepGoalHours)
+    }
 
     private var ringColor: Color {
         switch snapshot.readiness {
@@ -26,6 +36,12 @@ struct ReadinessDetailView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Score breakdown")
                         .metricLabelStyle()
+                    if let confidence = ReadinessCalculator.confidence(coverage: snapshot.readinessCoverage) {
+                        Label(confidence, systemImage: "info.circle")
+                            .font(.caption)
+                            .foregroundStyle(Theme.textPrimary.opacity(0.6))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     ForEach(factors) { factor in
                         factorRow(factor)
                     }
@@ -40,7 +56,7 @@ struct ReadinessDetailView: View {
                     Label("How it is calculated", systemImage: "function")
                         .font(.system(.subheadline, weight: .semibold))
                         .foregroundStyle(Theme.textPrimary)
-                    Text("Readiness weights sleep duration up to 40 points, overnight HRV against your own 30-day baseline up to 35, sleep quality up to 15, then subtracts up to 20 when your seven-day load climbs past the comfort ceiling. It is a relative measure — the trend across a week tells you far more than any single morning.")
+                    Text("Readiness weights sleep duration against your own nightly target, overnight HRV against your own 30-day baseline, and sleep quality — then subtracts for a seven-day load above your comfort ceiling, a resting heart rate above your own baseline, and a breathing rate above yours. Only the inputs actually measured count, and the score is scaled across those, so a night without your watch widens the uncertainty rather than reading as exhaustion. It is a relative measure: the trend across a week tells you far more than any single morning.")
                         .font(.footnote)
                         .foregroundStyle(Theme.textPrimary.opacity(0.68))
                         .fixedSize(horizontal: false, vertical: true)
@@ -88,31 +104,42 @@ struct ReadinessDetailView: View {
             HStack(spacing: 8) {
                 Image(systemName: factor.symbol)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(tint)
+                    .foregroundStyle(factor.isMeasured ? tint : Theme.textPrimary.opacity(0.3))
                     .frame(width: 18)
                 Text(factor.title)
                     .font(.system(.subheadline, weight: .semibold))
-                    .foregroundStyle(Theme.textPrimary)
+                    .foregroundStyle(factor.isMeasured ? Theme.textPrimary : Theme.textPrimary.opacity(0.5))
                 Spacer(minLength: 0)
-                Text(factor.isPenalty
-                     ? (factor.points > 0 ? "−\(Int(factor.points.rounded()))" : "0")
-                     : "+\(Int(factor.points.rounded()))")
-                    .font(.metric(15))
-                    .foregroundStyle(factor.isPenalty && factor.points > 0 ? Theme.danger : Theme.textPrimary)
-                Text("/ \(Int(factor.maxPoints))")
-                    .font(.system(.caption2, weight: .medium))
-                    .foregroundStyle(Theme.textPrimary.opacity(0.4))
-            }
-
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Theme.surfaceRaised)
-                    Capsule()
-                        .fill(tint)
-                        .frame(width: max(4, geometry.size.width * factor.fraction))
+                // An unmeasured input says so instead of showing a zero. A score
+                // of nought and a measurement that never happened are different
+                // facts, and only one of them is about the athlete.
+                if factor.isMeasured {
+                    Text(factor.isPenalty
+                         ? (factor.points > 0 ? "−\(Int(factor.points.rounded()))" : "0")
+                         : "+\(Int(factor.points.rounded()))")
+                        .font(.metric(15))
+                        .foregroundStyle(factor.isPenalty && factor.points > 0 ? Theme.danger : Theme.textPrimary)
+                    Text("/ \(Int(factor.maxPoints))")
+                        .font(.system(.caption2, weight: .medium))
+                        .foregroundStyle(Theme.textPrimary.opacity(0.4))
+                } else {
+                    Text("Not measured")
+                        .font(.system(.caption2, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary.opacity(0.4))
                 }
             }
-            .frame(height: 6)
+
+            if factor.isMeasured {
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Theme.surfaceRaised)
+                        Capsule()
+                            .fill(tint)
+                            .frame(width: max(4, geometry.size.width * factor.fraction))
+                    }
+                }
+                .frame(height: 6)
+            }
 
             Text(factor.detail)
                 .font(.caption2)

@@ -205,9 +205,33 @@ nonisolated struct FoodItem: Identifiable, Codable, Hashable, Sendable {
     var isLiquid: Bool = false
     var imageURL: URL?
     var source: FoodSource = .custom
+    /// Set on a bare number of calories logged without a food behind it.
+    ///
+    /// Optional rather than a defaulted `Bool` on purpose: Swift's generated
+    /// decoder does not fall back to a property's default when the key is
+    /// missing, so a non-optional here would refuse to read every diary entry
+    /// saved before this existed.
+    var quickAdd: Bool?
+
+    /// A number of calories with no food behind it — a restaurant meal, a
+    /// friend's cooking, anything where the figure is known and the ingredients
+    /// are not. Logged honestly as an estimate rather than dressed up as a
+    /// product with invented macros.
+    var isQuickAdd: Bool { quickAdd == true }
 
     /// `g` or `ml`, whichever this food is sensibly measured in.
     var measureUnit: String { isLiquid ? "ml" : "g" }
+
+    /// A bare calorie figure, held so that a 100 g portion is exactly that many
+    /// calories — the diary's arithmetic then needs no special case.
+    static func quickAdd(kilocalories: Double, name: String = "Quick add") -> FoodItem {
+        FoodItem(
+            name: name,
+            per100: NutritionFacts(energyKilocalories: max(0, kilocalories)),
+            portions: [FoodPortion(name: "Entry", grams: 100)],
+            quickAdd: true
+        )
+    }
 
     /// Brand first when there is one, since that is how a packet is recognised.
     var subtitle: String? {

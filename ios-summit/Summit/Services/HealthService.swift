@@ -30,6 +30,13 @@ final class HealthService {
     /// Last error shown to the user after a failed write.
     private(set) var lastWriteError: String?
 
+    /// The athlete's own nightly sleep target, when they have set one.
+    ///
+    /// Readiness measures sleep against this rather than a flat eight hours: a
+    /// settled six-hour sleeper was otherwise carrying a permanent penalty they
+    /// could do nothing about. Set from the goals the athlete keeps on the phone.
+    var sleepGoalHours: Double?
+
     /// Hourly breakdowns for past days the user has scrubbed back to, keyed by
     /// the start of that day. Today's hours live in `history`.
     private var hourlyByDay: [Date: [DashboardMetric: [Double]]] = [:]
@@ -78,7 +85,7 @@ final class HealthService {
         isLoading = true
         defer { isLoading = false }
 
-        let result = await store.loadSnapshot()
+        let result = await store.loadSnapshot(sleepGoalHours: sleepGoalHours)
         if let loaded = result.snapshot {
             snapshot = loaded
             hasHealthData = true
@@ -532,7 +539,9 @@ private actor HealthStore {
         var activities: [ActivityRecord]
     }
 
-    func loadSnapshot() async -> LoadResult {
+    /// `sleepGoalHours` is the athlete's own nightly target, passed in because
+    /// goals live on the phone's settings rather than in the Health store.
+    func loadSnapshot(sleepGoalHours: Double? = nil) async -> LoadResult {
         let now = Date()
         let calendar = Calendar.current
         let startOfToday = calendar.startOfDay(for: now)
@@ -572,6 +581,14 @@ private actor HealthStore {
         async let exerciseValue = sum(.appleExerciseTime, unit: .minute(), start: startOfToday, end: now)
         async let flightsValue = sum(.flightsClimbed, unit: .count(), start: startOfToday, end: now)
         async let respiratoryValue = average(.respiratoryRate, unit: breathsPerMinute, start: weekAgo, end: now)
+        // A month of breathing rates, read over the same window as the HRV and
+        // resting baselines so all three agree about what "normal" means.
+        async let respiratoryBaselineValue = average(
+            .respiratoryRate,
+            unit: breathsPerMinute,
+            start: calendar.date(byAdding: .day, value: -30, to: now) ?? weekAgo,
+            end: now
+        )
         async let bodyMassValue = mostRecent(.bodyMass, unit: .gramUnit(with: .kilo))
         async let exerciseSeries = dailySeries(.appleExerciseTime, unit: .minute(), days: 7)
         async let flightsSeries = dailySeries(.flightsClimbed, unit: .count(), days: 7)
@@ -599,14 +616,19 @@ private actor HealthStore {
         // With stages the score can weigh deep, REM and continuity; without them
         // it stays the duration-only figure it has always been.
         let sleepScore = sleepNight.isEmpty ? sleepScore(for: sleep) : sleepNight.quality
-        let readiness = ReadinessCalculator.score(
+        let respiratory = await respiratoryValue ?? 0
+        let respiratoryBaseline = await respiratoryBaselineValue ?? respiratory
+        let readiness = ReadinessCalculator.result(
             sleepSeconds: sleep,
             sleepScore: sleepScore,
             hrv: hrv,
             hrvBaseline: hrvBaseline,
             load: load,
             restingHeartRate: resting,
-            restingBaseline: restingBaseline
+            restingBaseline: restingBaseline,
+            respiratoryRate: respiratory,
+            respiratoryBaseline: respiratoryBaseline,
+            sleepGoalHours: sleepGoalHours
         )
 
         var zoneTotals: [Double] = [0, 0, 0, 0, 0]
@@ -619,8 +641,9 @@ private actor HealthStore {
 
         let loadSeries = weeklyLoadSeries(from: activities)
         let snapshot = HealthSnapshot(
-            readiness: readiness,
-            readinessCaption: ReadinessCalculator.caption(for: readiness),
+            readiness: readiness.score,
+            readinessCaption: ReadinessCalculator.caption(for: readiness.score),
+            readinessCoverage: readiness.coverage,
             sleepSeconds: sleep,
             sleepScore: sleepScore,
             sleepNight: sleepNight,
@@ -634,7 +657,8 @@ private actor HealthStore {
             restingBaseline: restingBaseline,
             exerciseMinutes: await exerciseValue ?? 0,
             flightsClimbed: await flightsValue ?? 0,
-            respiratoryRate: await respiratoryValue ?? 0,
+            respiratoryRate: respiratory,
+            respiratoryBaseline: respiratoryBaseline,
             bodyMass: await bodyMassValue ?? 0,
             sleepTrend: await sleepSeries,
             hrvTrend: await hrvSeries,

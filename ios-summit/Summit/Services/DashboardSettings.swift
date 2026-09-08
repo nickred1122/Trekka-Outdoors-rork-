@@ -21,6 +21,11 @@ nonisolated struct DashboardPreferences: Codable, Sendable, Equatable {
     /// before this switch existed still decode, defaulting to showing them.
     var showsTileCharts: Bool?
     var hasExploredMetrics: Bool
+    /// Tiles the athlete has widened to the full width of the screen.
+    ///
+    /// Optional so dashboards saved before tiles could be resized still decode,
+    /// in which case everything stays the size it always was.
+    var wide: [DashboardMetric]?
     /// Optional so dashboards saved before ranges existed still decode.
     var chartRange: MetricRange?
     /// A hand-picked day or date range, which takes over from the preset when set.
@@ -38,6 +43,7 @@ nonisolated struct DashboardPreferences: Codable, Sendable, Equatable {
         showsRecentActivity: true,
         showsTileCharts: true,
         hasExploredMetrics: false,
+        wide: [],
         chartRange: .week,
         chartSpan: nil
     )
@@ -51,6 +57,7 @@ nonisolated struct DashboardPreferences: Codable, Sendable, Equatable {
             repaired.order.append(metric)
         }
         repaired.hidden = hidden.filter { known.contains($0) }
+        repaired.wide = (wide ?? []).filter { known.contains($0) }
         return repaired
     }
 }
@@ -96,6 +103,34 @@ final class DashboardSettings {
     }
 
     var hasExploredMetrics: Bool { preferences.hasExploredMetrics }
+
+    // MARK: - Tile size
+
+    /// Whether this tile takes the full width of the screen.
+    ///
+    /// A wide tile is not decoration: at double the width the trend chart gets
+    /// enough room to show the shape of a month rather than a suggestion of it,
+    /// which is the difference between a sparkline and a graph you can read.
+    func isWide(_ metric: DashboardMetric) -> Bool {
+        (preferences.wide ?? []).contains(metric)
+    }
+
+    func setWide(_ isWide: Bool, for metric: DashboardMetric) {
+        var wide = preferences.wide ?? []
+        if isWide {
+            guard !wide.contains(metric) else { return }
+            wide.append(metric)
+        } else {
+            guard wide.contains(metric) else { return }
+            wide.removeAll { $0 == metric }
+        }
+        preferences.wide = wide
+        persist()
+    }
+
+    func toggleWidth(_ metric: DashboardMetric) {
+        setWide(!isWide(metric), for: metric)
+    }
 
     // MARK: - Charts
 
@@ -225,6 +260,7 @@ final class DashboardSettings {
         let span = preferences.chartSpan
         preferences = .standard
         preferences.chartRange = range
+        preferences.wide = []
         preferences.showsTileCharts = true
         preferences.chartSpan = span
         preferences.hasExploredMetrics = explored

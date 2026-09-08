@@ -49,17 +49,7 @@ struct TrainingInsightsCard: View {
                     .transition(.opacity)
             }
 
-            VStack(spacing: 0) {
-                ForEach(Array(insights.enumerated()), id: \.element.id) { index, insight in
-                    if index > 0 {
-                        Rectangle()
-                            .fill(Theme.border)
-                            .frame(height: 1)
-                            .padding(.leading, 38)
-                    }
-                    row(insight)
-                }
-            }
+            InsightRows(insights: insights)
 
             if let note = footnote {
                 Text(note)
@@ -122,37 +112,6 @@ struct TrainingInsightsCard: View {
                 .font(.caption)
                 .foregroundStyle(Theme.textPrimary.opacity(0.5))
             Spacer(minLength: 0)
-        }
-    }
-
-    private func row(_ insight: TrainingInsight) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: insight.symbol)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(tint(insight.tone))
-                .frame(width: 28, height: 28)
-                .background(tint(insight.tone).opacity(0.12), in: .rect(cornerRadius: 8))
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(insight.title)
-                    .font(.system(.caption, weight: .bold))
-                    .foregroundStyle(Theme.textPrimary)
-                Text(insight.detail)
-                    .font(.caption)
-                    .foregroundStyle(Theme.textPrimary.opacity(0.6))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .multilineTextAlignment(.leading)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.vertical, 9)
-    }
-
-    private func tint(_ tone: InsightTone) -> Color {
-        switch tone {
-        case .positive: Theme.positive
-        case .neutral: Theme.accent
-        case .caution: Theme.highlight
         }
     }
 

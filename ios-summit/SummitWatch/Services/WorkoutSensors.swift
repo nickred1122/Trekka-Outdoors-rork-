@@ -28,6 +28,7 @@ extension WatchSport {
         switch self {
         case .trailRun, .roadRun, .ultraRun, .track, .treadmill, .virtualRun: .running
         case .ride, .gravelRide, .mountainBike, .bikepacking, .eBike, .commute, .indoorRide: .cycling
+        case .handCycling: .handCycling
         case .hike, .ruck, .backpacking, .mountaineering: .hiking
         case .walk: .walking
         case .rockClimb, .boulder, .indoorClimb, .viaFerrata: .climbing
@@ -48,16 +49,42 @@ extension WatchSport {
         case .elliptical: .elliptical
         case .stairStepper: .stairClimbing
         case .row: .rowing
+        case .jumpRope: .jumpRope
+        case .stretching: .flexibility
+        case .barre: .barre
+        case .taiChi: .taiChi
+        case .coreTraining: .coreTraining
+        case .danceFitness: .cardioDance
+        case .boxing: .boxing
+        case .kickboxing: .kickboxing
+        case .martialArts: .martialArts
+        case .climbStairs: .stairs
         case .soccer: .soccer
         case .basketball: .basketball
         case .tennis: .tennis
         case .pickleball: .pickleball
         case .golf: .golf
         case .discGolf: .discSports
+        case .volleyball: .volleyball
+        case .badminton: .badminton
+        case .tableTennis: .tableTennis
+        case .squash: .squash
+        case .racquetball: .racquetball
+        case .baseball: .baseball
+        case .softball: .softball
+        case .americanFootball: .americanFootball
+        case .hockey: .hockey
+        case .rugby: .rugby
+        case .cricket: .cricket
+        case .lacrosse: .lacrosse
+        case .bowling: .bowling
         case .skateboard: .skatingSports
         case .horseback: .equestrianSports
         case .hunt: .hunting
         case .fish: .fishing
+        // Health has no yard-work type, so these file as Other rather than
+        // borrowing a sport that would misreport the effort.
+        case .lawnMowing, .yardWork, .snowShoveling, .other: .other
         }
     }
 }

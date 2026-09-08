@@ -30,7 +30,12 @@ struct WatchPowerView: View {
             } header: {
                 Text("Power saver")
             } footer: {
-                Text("Time, distance, elevation and laps are recorded exactly the same in either mode — heart rate is the one thing you trade away.")
+                // This used to say heart rate was the only thing traded away,
+                // which the list two sections below plainly contradicts — GPS is
+                // eased off, the map steps aside and haptics go quiet as well.
+                // A footer that argues with the screen it sits on teaches the
+                // athlete to trust neither.
+                Text("Time, distance, elevation and laps are recorded exactly the same in either mode. What you trade is listed below.")
             }
 
             Section {
@@ -58,6 +63,21 @@ struct WatchPowerView: View {
                 }
             } header: {
                 Text("What power saver changes")
+            }
+
+            Section {
+                ForEach(PowerSaverPlan.unchanged, id: \.self) { item in
+                    Label(item, systemImage: "checkmark")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.textPrimary.opacity(0.7))
+                }
+            } header: {
+                Text("Still recorded")
+            } footer: {
+                // Says where this setting's reach ends, in the same words the
+                // watch uses, so a flat battery is never blamed on a switch that
+                // could never have helped.
+                Text("This turns down Trekka's own sensors. watchOS Low Power Mode is a separate switch in the Settings app on your watch.")
             }
 
             Section {

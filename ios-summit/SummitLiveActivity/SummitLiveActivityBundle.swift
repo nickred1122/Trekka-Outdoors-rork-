@@ -5,5 +5,6 @@ import SwiftUI
 struct SummitLiveActivityBundle: WidgetBundle {
     var body: some Widget {
         SummitLiveActivity()
+        SummitInsightWidget()
     }
 }

@@ -358,12 +358,21 @@ struct TodayView: View {
             }
             .buttonStyle(TilePressStyle())
         } else {
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: TileMetrics.minimumWidth), spacing: 12)],
-                spacing: 12
-            ) {
-                ForEach(metrics) { metric in
-                    tile(for: metric, goal: goals[metric])
+            // Rows rather than an adaptive grid, because a widened tile has to
+            // take the whole width and a grid cannot be told to let one cell
+            // span two columns.
+            VStack(spacing: 12) {
+                ForEach(TileRow.rows(for: metrics, isWide: settings.isWide)) { row in
+                    HStack(spacing: 12) {
+                        ForEach(row.metrics) { metric in
+                            tile(for: metric, goal: goals[metric])
+                        }
+                        // Keeps a lone narrow tile at half width instead of
+                        // stretching it across the row.
+                        if row.needsFiller {
+                            Color.clear.frame(maxWidth: .infinity)
+                        }
+                    }
                 }
             }
         }
@@ -374,6 +383,7 @@ struct TodayView: View {
         let window = window
         let series = samples(for: metric)
         let headline = MetricSeries.headline(metric: metric, window: window, samples: series)
+        let isWide = settings.isWide(metric)
         NavigationLink(value: DashboardDestination.metric(metric)) {
             MetricTile(
                 glyph: metric.glyph,
@@ -389,11 +399,24 @@ struct TodayView: View {
                 // actually reporting today. Scrubbed back to March, the bar
                 // would be measuring today's steps against a March column.
                 goal: window.isToday ? goal : nil,
-                showsSparkline: settings.showsTileCharts
+                showsSparkline: settings.showsTileCharts,
+                isWide: isWide
             )
         }
         .buttonStyle(TilePressStyle())
         .contextMenu {
+            // Resizing happens here, on the tile itself, rather than in a
+            // separate editor: the only way to judge whether a tile deserves
+            // the width is to see it at that width, on the real dashboard.
+            Button {
+                settings.toggleWidth(metric)
+                tileFeedback += 1
+            } label: {
+                Label(
+                    isWide ? "Make narrow" : "Make wide",
+                    systemImage: isWide ? "rectangle.compress.vertical" : "rectangle.expand.vertical"
+                )
+            }
             Button {
                 settings.moveToTop(metric)
                 tileFeedback += 1
@@ -415,7 +438,7 @@ struct TodayView: View {
     }
 
     private var hintRow: some View {
-        Label("Tap a tile for the full breakdown · long-press to switch bars and lines", systemImage: "hand.tap.fill")
+        Label("Tap a tile for the full breakdown · long-press to resize or reorder it", systemImage: "hand.tap.fill")
             .font(.caption2)
             .foregroundStyle(Theme.textPrimary.opacity(0.45))
             .frame(maxWidth: .infinity)

@@ -5,6 +5,7 @@ nonisolated enum SettingsDestination: Hashable, Sendable {
     case backup
     case goals
     case eventLog
+    case tabBar
 }
 
 /// Everything that configures Trekka, gathered in one place instead of hiding
@@ -20,6 +21,7 @@ struct SettingsView: View {
     @Environment(ProfileSettings.self) private var profile
     @Environment(GoalSettings.self) private var goals
     @Environment(ConsentSettings.self) private var consent
+    @Environment(TabBarSettings.self) private var tabBar
     @Binding var path: NavigationPath
 
     @State private var showsHealthSheet = false
@@ -31,6 +33,12 @@ struct SettingsView: View {
 
     private var syncedRouteCount: Int {
         store.routes.filter(\.isSyncedToWatch).count
+    }
+
+    private var tabBarDetail: String {
+        let hidden = tabBar.hiddenTabs.count
+        guard hidden > 0 else { return "All \(tabBar.visibleTabs.count) screens shown" }
+        return "\(tabBar.visibleTabs.count) shown \u{00b7} \(hidden) hidden"
     }
 
     var body: some View {
@@ -53,6 +61,14 @@ struct SettingsView: View {
                         detail: "\(dashboard.visibleMetrics.count) shown · \(dashboard.showsTileCharts ? "with charts" : "no charts")"
                     ) {
                         showsCustomizeSheet = true
+                    }
+                    divider
+                    row(
+                        symbol: "rectangle.bottomthird.inset.filled",
+                        title: "Bottom bar",
+                        detail: tabBarDetail
+                    ) {
+                        path.append(SettingsDestination.tabBar)
                     }
                     divider
                     row(

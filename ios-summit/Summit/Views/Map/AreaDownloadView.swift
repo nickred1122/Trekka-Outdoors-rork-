@@ -21,6 +21,19 @@ struct AreaDownloadView: View {
     @State private var suggestedName: String = ""
     @State private var locateToken = 0
     @State private var namingTask: Task<Void, Never>?
+
+    /// Searching for somewhere by name, rather than panning to it.
+    ///
+    /// Panning from where you stand to a national park three states away is
+    /// minutes of dragging, and it was the only way to aim this screen.
+    @State private var query: String = ""
+    @State private var search = PlaceSearchService.shared
+    /// Moves the map when a search result is chosen. Separate from `focus`,
+    /// which belongs to the locate button.
+    @State private var searchFocus: TopoFocus?
+    /// Counts chosen results, so two searches landing on the same place still
+    /// each move the camera. A focus with an unchanged token is ignored.
+    @State private var searchToken = 0
     /// Whether this square should also go to the wrist.
     ///
     /// It could not before: an area kept by hand stayed on the phone, with no
@@ -71,6 +84,7 @@ struct AreaDownloadView: View {
                 mapArea
                 controls
             }
+            .overlay(alignment: .top) { searchResults }
         }
         .navigationTitle("Download an area")
         .navigationBarTitleDisplayMode(.inline)
@@ -83,6 +97,7 @@ struct AreaDownloadView: View {
         .onDisappear {
             location.stop()
             namingTask?.cancel()
+            search.clear()
         }
     }
 
@@ -100,7 +115,7 @@ struct AreaDownloadView: View {
                     allowsPan: !isDrawing,
                     showsContours: true,
                     showsPlaceLabels: true,
-                    focus: focus,
+                    focus: searchFocus ?? focus,
                     onCameraChange: handleCamera,
                     palette: .paperSheet,
                     labelFont: .system(size: 11, weight: .semibold),
@@ -109,6 +124,7 @@ struct AreaDownloadView: View {
                 .overlay { selectionFrame(side: side) }
                 .overlay { if isDrawing { drawCatcher(size: proxy.size) } }
                 .overlay(alignment: .topTrailing) { mapButtons }
+                .overlay(alignment: .topLeading) { searchBar }
                 .onAppear {
                     if cameraCentre == nil { cameraCentre = anchor }
                 }
@@ -157,7 +173,10 @@ struct AreaDownloadView: View {
                             abs(Double(value.location.x) - centreX),
                             abs(Double(value.location.y) - centreY)
                         )
-                        radiusMetres = min(max(fromCentre * scale, 1_000), 15_000)
+                        radiusMetres = min(
+                            max(fromCentre * scale, AreaDownloadLimits.minRadiusMetres),
+                            AreaDownloadLimits.maxRadiusMetres
+                        )
                     }
                     .onEnded { _ in dragScale = nil }
             )
@@ -209,6 +228,137 @@ struct AreaDownloadView: View {
         )
     }
 
+    // MARK: - Search
+
+    /// Aiming the screen by name.
+    ///
+    /// Panning from where you stand to a national park in the next state was
+    /// minutes of dragging, and it used to be the only way to point this screen
+    /// at anywhere but your own doorstep.
+    private var searchBar: some View {
+        HStack(spacing: 7) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.mapControlLabel.opacity(0.6))
+
+            TextField("Search for a place", text: $query)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Theme.mapControlLabel)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                .onChange(of: query) { _, newValue in
+                    search.search(newValue, near: cameraCentre)
+                }
+
+            if search.isSearching {
+                ProgressView()
+                    .controlSize(.mini)
+            } else if !query.isEmpty {
+                Button {
+                    query = ""
+                    search.clear()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.mapControlLabel.opacity(0.5))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear the search")
+            }
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 9)
+        .background(Theme.mapControl, in: .capsule)
+        .overlay { Capsule().strokeBorder(Theme.mapControlBorder, lineWidth: 1) }
+        .frame(maxWidth: 230)
+        .padding(10)
+    }
+
+    @ViewBuilder
+    private var searchResults: some View {
+        if !query.isEmpty, !search.results.isEmpty || search.foundNothing {
+            VStack(spacing: 0) {
+                if search.foundNothing {
+                    Text("Nothing found for \u{201c}\(query)\u{201d}")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textPrimary.opacity(0.6))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                } else {
+                    ForEach(search.results) { result in
+                        resultRow(result)
+                        if result.id != search.results.last?.id {
+                            Divider().overlay(Theme.border)
+                        }
+                    }
+                }
+            }
+            .background(Theme.mapPanel, in: .rect(cornerRadius: 14))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14)
+                    .strokeBorder(Theme.border, lineWidth: 1)
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 62)
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        }
+    }
+
+    private func resultRow(_ result: PlaceResult) -> some View {
+        Button {
+            choose(result)
+        } label: {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(result.name)
+                        .font(.system(.subheadline, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(1)
+                    if !result.context.isEmpty {
+                        Text(result.context)
+                            .font(.caption2)
+                            .foregroundStyle(Theme.textPrimary.opacity(0.55))
+                            .lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 0)
+                Text("\(Formatters.distance(result.radiusMetres * 2)) \(units.system.distanceUnit)")
+                    .font(.system(size: 10, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.accent)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Moves the map to a found place and opens the square at roughly its size.
+    ///
+    /// A national park comes back many kilometres across and a trailhead comes
+    /// back a few hundred metres, so sizing the square to the answer saves the
+    /// slider work in the overwhelming majority of cases. It is only ever a
+    /// starting point — the slider and the drawing gesture still have the last
+    /// word.
+    private func choose(_ result: PlaceResult) {
+        cameraCentre = result.centre
+        radiusMetres = min(
+            max(result.radiusMetres, AreaDownloadLimits.minRadiusMetres),
+            AreaDownloadLimits.maxRadiusMetres
+        )
+        suggestedName = result.name
+        searchToken += 1
+        searchFocus = TopoFocus(
+            latitude: result.centre.latitude,
+            longitude: result.centre.longitude,
+            token: searchToken
+        )
+        query = ""
+        search.clear()
+    }
+
     private var waiting: some View {
         VStack(spacing: 10) {
             Image(systemName: location.isDenied ? "location.slash" : "location.magnifyingglass")
@@ -234,8 +384,12 @@ struct AreaDownloadView: View {
         VStack(spacing: 14) {
             sizeRow
 
-            Slider(value: $radiusMetres, in: 1_000...15_000, step: 500)
-                .tint(Theme.accent)
+            Slider(
+                value: $radiusMetres,
+                in: AreaDownloadLimits.minRadiusMetres...AreaDownloadLimits.maxRadiusMetres,
+                step: 500
+            )
+            .tint(Theme.accent)
 
             TextField(suggestedName.isEmpty ? "Name this area" : suggestedName, text: $name)
                 .textFieldStyle(.plain)

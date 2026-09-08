@@ -124,6 +124,9 @@ struct TrekkaTopoMap: View {
     @State private var dragTranslation: CGSize = .zero
     @State private var pinchScale: CGFloat = 1
     @State private var hasFramed = false
+    /// The drag translation the last mid-gesture tile fetch was made at, so
+    /// ground is asked for once per screenful rather than once per frame.
+    @State private var lastPrefetch: CGSize = .zero
 
     var body: some View {
         // Read here, in the body itself, and deliberately not inside the Canvas.
@@ -249,11 +252,67 @@ struct TrekkaTopoMap: View {
         DragGesture()
             .onChanged { value in
                 dragTranslation = value.translation
+                prefetchIfMoved(value.translation)
             }
             .onEnded { value in
-                dragTranslation = .zero
-                commitPan(translation: value.translation)
+                glide(from: value.translation, predicted: value.predictedEndTranslation)
             }
+    }
+
+    /// Asks for the ground the drag has uncovered, roughly every third of a
+    /// screen.
+    ///
+    /// Nothing was fetched until the finger came up, because the camera does not
+    /// move during a drag — the gesture shifts what is already drawn. Drag any
+    /// distance and you were pulling blank paper across the view, waiting for it
+    /// to fill in after you had stopped.
+    private func prefetchIfMoved(_ translation: CGSize) {
+        let threshold: Double = max(Double(min(size.width, size.height)) / 3, 60)
+        let deltaX: Double = Double(translation.width - lastPrefetch.width)
+        let deltaY: Double = Double(translation.height - lastPrefetch.height)
+        guard hypot(deltaX, deltaY) >= threshold else { return }
+        lastPrefetch = translation
+        model.prefetch(size: size, offset: translation)
+    }
+
+    /// Carries the pan on after the finger leaves, then commits where it landed.
+    ///
+    /// A map that stops dead the instant you let go feels stuck to the glass.
+    /// The flick comes from the gesture's own predicted end point — the same
+    /// figure the system uses for scroll views — and is clamped, so a fast swipe
+    /// coasts rather than launching the athlete into the next county.
+    private func glide(from translation: CGSize, predicted: CGSize) {
+        lastPrefetch = .zero
+
+        let extraX: Double = Double(predicted.width - translation.width)
+        let extraY: Double = Double(predicted.height - translation.height)
+        let reach: Double = Double(max(size.width, size.height)) * 0.55
+        let distance: Double = hypot(extraX, extraY)
+
+        // Below a few points there is no flick to speak of, and animating it
+        // would only delay the commit.
+        guard distance > 8 else {
+            dragTranslation = .zero
+            commitPan(translation: translation)
+            return
+        }
+
+        let scale: Double = distance > reach ? reach / distance : 1
+        let target = CGSize(
+            width: translation.width + CGFloat(extraX * scale),
+            height: translation.height + CGFloat(extraY * scale)
+        )
+
+        // Fetch what the glide is heading for now, so the ground is there when it
+        // arrives rather than a moment afterwards.
+        model.prefetch(size: size, offset: target)
+
+        withAnimation(.easeOut(duration: 0.42)) {
+            dragTranslation = target
+        } completion: {
+            dragTranslation = .zero
+            commitPan(translation: target)
+        }
     }
 
     private func commitPan(translation: CGSize) {

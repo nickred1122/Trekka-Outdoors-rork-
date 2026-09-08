@@ -34,8 +34,7 @@ struct TrekkaMapSurface: View {
     private let location = MapLocationService.shared
 
     var body: some View {
-        switch baseStyle {
-        case .trekka:
+        if let palette = baseStyle.palette {
             TrekkaTopoMap(
                 overlay: overlay,
                 centre: centre,
@@ -46,7 +45,7 @@ struct TrekkaMapSurface: View {
                 showsPlaceLabels: true,
                 reframeToken: recenterToken,
                 focus: focus,
-                palette: .paperSheet,
+                palette: palette,
                 compact: false,
                 labelFont: .system(size: 11, weight: .semibold),
                 attributionFont: .system(size: 9)
@@ -54,7 +53,7 @@ struct TrekkaMapSurface: View {
             .overlay(alignment: .top) { locateStatus }
             .onAppear { if showsUserLocation { location.start() } }
             .onDisappear { if showsUserLocation { location.stop() } }
-        case .terrain, .satellite:
+        } else {
             TopoMapView(
                 routePoints: routePoints,
                 breadcrumb: breadcrumb,

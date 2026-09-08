@@ -107,3 +107,42 @@ nonisolated struct DayNutrition: Sendable, Equatable {
         entries(for: meal).reduce(NutritionFacts.zero) { $0 + $1.facts }
     }
 }
+
+/// A week of eating, for a report rather than a single day.
+///
+/// Only days with something logged are included. Averaging in the days somebody
+/// forgot to open the app would report a starvation diet and then offer advice
+/// based on it.
+nonisolated struct NutritionWeek: Sendable, Equatable {
+    var days: [DayNutrition] = []
+
+    var loggedDayCount: Int { days.count }
+    var isEmpty: Bool { days.isEmpty }
+
+    var averageEnergy: Double {
+        guard !days.isEmpty else { return 0 }
+        return days.reduce(0) { $0 + $1.total.energyKilocalories } / Double(days.count)
+    }
+
+    var averageProtein: Double {
+        guard !days.isEmpty else { return 0 }
+        return days.reduce(0) { $0 + $1.total.proteinGrams } / Double(days.count)
+    }
+
+    /// Days inside a tenth either side of the target — close enough that nobody
+    /// sensible would call it a miss.
+    func daysOnTarget(_ target: Double) -> Int {
+        guard target > 0 else { return 0 }
+        return days.filter { abs($0.total.energyKilocalories - target) <= target * 0.1 }.count
+    }
+
+    func daysOver(_ target: Double) -> Int {
+        guard target > 0 else { return 0 }
+        return days.filter { $0.total.energyKilocalories > target * 1.1 }.count
+    }
+
+    func daysUnder(_ target: Double) -> Int {
+        guard target > 0 else { return 0 }
+        return days.filter { $0.total.energyKilocalories < target * 0.9 }.count
+    }
+}

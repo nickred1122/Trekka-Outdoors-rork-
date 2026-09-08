@@ -16,6 +16,14 @@ struct MetricTile: View {
     var goal: GoalProgress?
     var showsSparkline: Bool = true
     var showsDisclosure: Bool = true
+    /// Whether this tile has been widened to the full width of the dashboard.
+    ///
+    /// It earns its room by spending it on the chart: at double the width a
+    /// sparkline has enough horizontal space to show the shape of a month rather
+    /// than hint at it, so the chart gets taller too and the value gets bigger.
+    var isWide: Bool = false
+
+    private var chartHeight: CGFloat { isWide ? 58 : 26 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: showsSparkline ? 8 : 6) {
@@ -47,7 +55,7 @@ struct MetricTile: View {
 
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(value)
-                    .font(.metric(showsSparkline ? 28 : 22))
+                    .font(.metric(isWide ? 34 : (showsSparkline ? 28 : 22)))
                     .foregroundStyle(Theme.textPrimary)
                     .contentTransition(.numericText())
                 if let unit {
@@ -70,7 +78,7 @@ struct MetricTile: View {
 
             if showsSparkline {
                 MiniMetricChart(samples: samples, color: trendColor)
-                    .frame(height: 26)
+                    .frame(height: chartHeight)
                 if let caption {
                     Text(caption)
                         .font(.system(size: 10, weight: .medium))
