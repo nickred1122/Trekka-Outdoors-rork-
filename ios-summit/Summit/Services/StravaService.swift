@@ -145,12 +145,13 @@ final class StravaService {
     /// why the scheme needs no entry in the app's registered URL types.
     ///
     /// Strava checks the redirect against the "Authorization Callback Domain" on
-    /// the API settings page, comparing it to the *host* part of this URI — so
-    /// that field has to read `localhost`, not a domain Trekka owns. Changing one
-    /// of these two without the other breaks sign-in with an `invalid` error from
-    /// Strava before their page even loads.
+    /// the API settings page, comparing it to the *host* part of this URI — that
+    /// field currently reads `trekkaoutdoors.com`, so the host here must match it
+    /// exactly even though Trekka never visits that address. Changing one of the
+    /// two without the other breaks sign-in with an `invalid` error from Strava
+    /// before their page even loads.
     private static let callbackScheme = "trekka"
-    private static let redirectURI = "trekka://localhost/strava"
+    private static let redirectURI = "trekka://trekkaoutdoors.com/strava"
 
     private(set) var connection: Connection = .signedOut
     /// The workout currently being sent, so its row can show a spinner.
