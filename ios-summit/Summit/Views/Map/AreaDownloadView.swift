@@ -28,6 +28,11 @@ struct AreaDownloadView: View {
     /// whose reason for downloading it was the watch.
     @State private var sendsToWatch = true
 
+    /// What goes into the download. Topographic by default — contour lines are
+    /// the reason to carry a map into the hills at all — but a city runner or
+    /// somebody short of space can leave them out and halve the wait.
+    @State private var detail: MapDownloadDetail = .topographic
+
     @State private var link = WatchLink.shared
 
     /// Drawing the square, rather than panning the ground under it.
@@ -55,7 +60,7 @@ struct AreaDownloadView: View {
 
     private var plan: (tileCount: Int, isReduced: Bool)? {
         guard let centre = cameraCentre else { return nil }
-        return MapPackStore.areaPlan(centre: centre, radiusMetres: radiusMetres)
+        return MapPackStore.areaPlan(centre: centre, radiusMetres: radiusMetres, detail: detail)
     }
 
     var body: some View {
@@ -240,6 +245,8 @@ struct AreaDownloadView: View {
                 .padding(.vertical, 10)
                 .background(Theme.surfaceRaised, in: .rect(cornerRadius: 10))
 
+            detailPicker
+
             if let plan, plan.isReduced {
                 warning("This area is too large to keep at full detail, so the closest zoom levels are left out. The ground still draws, just less finely. A smaller area keeps everything.")
             }
@@ -275,7 +282,7 @@ struct AreaDownloadView: View {
     /// it, and quoting the full figure would talk someone out of a free square.
     private var coverageDetail: String {
         guard let plan, let centre = cameraCentre else { return "Pan the map to choose where" }
-        let new = mapPacks.newTileCount(forArea: centre, radiusMetres: radiusMetres)
+        let new = mapPacks.newTileCount(forArea: centre, radiusMetres: radiusMetres, detail: detail)
 
         guard new > 0 else {
             return "\(plan.tileCount) pieces \u{00b7} all of it is already on your map"
@@ -287,6 +294,64 @@ struct AreaDownloadView: View {
             return "\(new) new pieces\(sharedPart) \u{00b7} size known once downloaded"
         }
         return "\(new) new pieces\(sharedPart) \u{00b7} roughly \(MapPackFormat.describe(bytes: new * average)) added"
+    }
+
+    /// Which map to keep.
+    ///
+    /// Both options draw the same cartography in the same colours — the paper
+    /// and night sheets are a display choice made later, and putting them here
+    /// would suggest they changed what gets stored. What genuinely differs is
+    /// whether the height data behind the contour lines comes down too.
+    private var detailPicker: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("Map type")
+                .metricLabelStyle()
+
+            HStack(spacing: 8) {
+                ForEach(MapDownloadDetail.allCases) { option in
+                    detailOption(option)
+                }
+            }
+        }
+    }
+
+    private func detailOption(_ option: MapDownloadDetail) -> some View {
+        let isSelected = detail == option
+        return Button {
+            detail = option
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Image(systemName: option.symbol)
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(option.title)
+                        .font(.system(.subheadline, weight: .bold))
+                    Spacer(minLength: 0)
+                }
+                Text(option.detail)
+                    .font(.caption2)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(option.sizeNote)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(isSelected ? Theme.accent : Theme.textPrimary.opacity(0.4))
+            }
+            .foregroundStyle(isSelected ? Theme.textPrimary : Theme.textPrimary.opacity(0.6))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(Theme.surfaceRaised, in: .rect(cornerRadius: 11))
+            .overlay {
+                RoundedRectangle(cornerRadius: 11)
+                    .strokeBorder(
+                        isSelected ? Theme.accent.opacity(0.7) : Color.clear,
+                        lineWidth: 1.5
+                    )
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(option.title). \(option.detail). \(option.sizeNote).")
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 
     @ViewBuilder
@@ -394,6 +459,7 @@ struct AreaDownloadView: View {
             centre: centre,
             radiusMetres: radiusMetres,
             name: resolved,
+            detail: detail,
             sendToWatch: sendsToWatch && link.isPaired && link.isWatchAppInstalled
         )
     }

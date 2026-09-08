@@ -108,6 +108,13 @@ struct MapPageView: View {
             .onDisappear {
                 crownClaim?.cancel()
                 crownClaim = nil
+                // Handed back rather than merely abandoned. A focused view that
+                // is removed while still holding the Crown leaves watchOS with
+                // nothing focused at all, and the page carousel underneath does
+                // not take it back on its own — so after one visit to the map the
+                // Crown scrolled nothing anywhere, which reads as the Crown
+                // having died rather than as focus being lost.
+                isCrownFocused = false
             }
             .animation(.snappy, value: reroute)
             .animation(.snappy, value: isExploring)

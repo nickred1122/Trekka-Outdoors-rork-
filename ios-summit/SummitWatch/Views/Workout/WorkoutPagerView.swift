@@ -29,6 +29,21 @@ struct WorkoutPagerView: View {
     /// the pager so the Digital Crown is free for its dials.
     @State private var showsSetLogger = false
 
+    /// The Crown's home when nothing has taken it away.
+    ///
+    /// The map and the set logger both claim focus for their own dials, and
+    /// giving it up when they close is not the same as handing it back. With
+    /// nowhere to hand it to, the Crown scrolled nothing at all after the first
+    /// visit to either.
+    @FocusState private var isPagerFocused: Bool
+
+    /// Raised while the workout screen is too fresh to trust a touch.
+    ///
+    /// A press that began life on the Start button can still be down when this
+    /// screen replaces it, and the long-press shortcut would read that as a
+    /// deliberate hold and open the controls over a workout one second old.
+    @State private var isSettling = true
+
     /// The data pages, without the map: the map has its own gesture now, so
     /// leaving it in the vertical stack too would put it in two places at once.
     private var screens: [WatchScreen] {
@@ -52,6 +67,8 @@ struct WorkoutPagerView: View {
             switch engine.phase {
             case .countdown(let value):
                 countdown(value)
+            case .arming:
+                arming
             case .acquiring:
                 acquiring
             case .finished:
@@ -94,6 +111,24 @@ struct WorkoutPagerView: View {
                     .lineLimit(1)
             }
         }
+    }
+
+    /// The moment between the tap and the first tick, while the sensors wake.
+    ///
+    /// Usually gone in a blink, so it says nothing and offers nothing: a screen
+    /// this brief cannot be read, and putting buttons on it only guarantees the
+    /// athlete sees something flash past that they had no chance to use.
+    private var arming: some View {
+        VStack(spacing: WatchDisplay.spacing(7)) {
+            Image(systemName: sport.symbol)
+                .font(.watch(30, weight: .semibold))
+                .foregroundStyle(sport.tint)
+                .symbolEffect(.pulse)
+            Text(sport.title)
+                .font(.watch(12, weight: .bold))
+                .foregroundStyle(WatchTheme.textPrimary)
+        }
+        .accessibilityLabel("Starting \(sport.title)")
     }
 
     /// Precise start: the sensors are running, the clock is not, and the screen
@@ -177,6 +212,7 @@ struct WorkoutPagerView: View {
         }
         .overlay(alignment: .top) { if !showsMenu && !showsSetLogger { statusBar } }
         .overlay(alignment: .bottom) { lapBanner }
+        .overlay(alignment: .bottomTrailing) { quickActionButton }
         .overlay(alignment: .center) { powerBanner }
         .overlay(alignment: .top) { if !showsMenu { navigationBanner } }
         .overlay(alignment: .bottom) { startBanner }
@@ -193,8 +229,23 @@ struct WorkoutPagerView: View {
         // page already has visible buttons for everything it does.
         .simultaneousGesture(
             LongPressGesture(minimumDuration: 0.45).onEnded { _ in openMenu() },
-            including: showsMap || showsEndConfirmation || showsSetLogger ? .none : .all
+            including: showsMap || showsEndConfirmation || showsSetLogger || isSettling ? .none : .all
         )
+        // The workout screen can arrive under a finger that is still pressing
+        // Start, so the shortcuts stand down until that press is certainly over.
+        .task(id: engine.phase) {
+            guard engine.phase == .active else { return }
+            isSettling = true
+            try? await Task.sleep(for: .milliseconds(700))
+            isSettling = false
+        }
+        // Focus comes home whenever the two views that borrow it are done with
+        // it, so the Crown always turns something.
+        .task(id: showsMap || showsSetLogger) {
+            guard !showsMap, !showsSetLogger else { return }
+            try? await Task.sleep(for: .milliseconds(120))
+            isPagerFocused = true
+        }
         .animation(.snappy(duration: 0.28), value: showsMap)
         .animation(.snappy(duration: 0.26), value: showsSetLogger)
         .animation(.snappy(duration: 0.24), value: showsMenu)
@@ -260,6 +311,7 @@ struct WorkoutPagerView: View {
             }
         }
         .tabViewStyle(.verticalPage)
+        .focused($isPagerFocused)
     }
 
     @ViewBuilder
@@ -551,6 +603,55 @@ struct WorkoutPagerView: View {
                 .padding(.bottom, 6)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .accessibilityLabel(banner)
+        }
+    }
+
+    /// The one control that can be reached without looking, and the only thing
+    /// on this screen wired to a physical gesture.
+    ///
+    /// watchOS reserves the side button and the Crown press for the system, so
+    /// the primary action is the only physical control an app may claim. Marking
+    /// this button as it means double tap fires it on the watches that have the
+    /// gesture, AssistiveTouch fires it for anyone using that, and Ultra's Action
+    /// button reaches it through a Shortcut — while a plain tap still works for
+    /// every other watch.
+    ///
+    /// It stands down whenever anything is over the workout, so a double tap can
+    /// never pause a workout the athlete was busy stopping.
+    @ViewBuilder
+    private var quickActionButton: some View {
+        let action = settings.quickAction
+        if action.isEnabled, !showsMenu, !showsMap, !showsSetLogger, !showsEndConfirmation {
+            let isPaused = engine.phase == .paused
+            Button {
+                perform(action)
+            } label: {
+                Image(systemName: action.symbol(isPaused: isPaused))
+                    .font(.watch(12, weight: .bold))
+                    .foregroundStyle(WatchTheme.canvas)
+                    .contentTransition(.symbolEffect(.replace))
+                    .frame(
+                        width: WatchDisplay.scaled(28, atLeast: 26),
+                        height: WatchDisplay.scaled(28, atLeast: 26)
+                    )
+                    .background(isPaused ? WatchTheme.positive : sport.tint, in: .circle)
+            }
+            .buttonStyle(.plain)
+            .handGestureShortcut(.primaryAction)
+            // Out of the focus system: a button here would be a rival for the
+            // Crown the page carousel needs.
+            .focusable(false)
+            .padding(.trailing, 5)
+            .padding(.bottom, 5)
+            .accessibilityLabel(action.label(isPaused: isPaused))
+        }
+    }
+
+    private func perform(_ action: WatchQuickAction) {
+        switch action {
+        case .pauseResume: engine.togglePause()
+        case .lap: engine.markLap()
+        case .off: break
         }
     }
 

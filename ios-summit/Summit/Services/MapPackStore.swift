@@ -162,12 +162,20 @@ final class MapPackStore {
     /// The number that makes the shared map worth having: for a route crossing
     /// somewhere already covered it can be a small fraction of the total, or
     /// nothing at all.
-    func newTileCount(forRoute coordinates: [CLLocationCoordinate2D], widened: Bool = false) -> Int {
-        newTileCount(in: MapPackPlanner.plan(for: coordinates, widened: widened))
+    func newTileCount(
+        forRoute coordinates: [CLLocationCoordinate2D],
+        widened: Bool = false,
+        detail: MapDownloadDetail = .topographic
+    ) -> Int {
+        newTileCount(in: detail.trim(MapPackPlanner.plan(for: coordinates, widened: widened)))
     }
 
-    func newTileCount(forArea centre: CLLocationCoordinate2D, radiusMetres: Double) -> Int {
-        newTileCount(in: MapPackPlanner.plan(around: centre, radiusMetres: radiusMetres))
+    func newTileCount(
+        forArea centre: CLLocationCoordinate2D,
+        radiusMetres: Double,
+        detail: MapDownloadDetail = .topographic
+    ) -> Int {
+        newTileCount(in: detail.trim(MapPackPlanner.plan(around: centre, radiusMetres: radiusMetres)))
     }
 
     private func newTileCount(in plan: MapPackPlanner.Plan) -> Int {
@@ -192,17 +200,20 @@ final class MapPackStore {
     /// loud, because the map will be coarser than the athlete asked for.
     nonisolated static func areaPlan(
         centre: CLLocationCoordinate2D,
-        radiusMetres: Double
+        radiusMetres: Double,
+        detail: MapDownloadDetail = .topographic
     ) -> (tileCount: Int, isReduced: Bool) {
         var requested = 0
         for zoom in MapPackPlanner.vectorZooms {
             requested += MapPackPlanner.areaTiles(around: centre, radiusMetres: radiusMetres, zoom: zoom).count
         }
-        for zoom in MapPackPlanner.terrainZooms {
-            requested += MapPackPlanner.areaTiles(around: centre, radiusMetres: radiusMetres, zoom: zoom).count
+        if detail.includesTerrain {
+            for zoom in MapPackPlanner.terrainZooms {
+                requested += MapPackPlanner.areaTiles(around: centre, radiusMetres: radiusMetres, zoom: zoom).count
+            }
         }
 
-        let plan = MapPackPlanner.plan(around: centre, radiusMetres: radiusMetres)
+        let plan = detail.trim(MapPackPlanner.plan(around: centre, radiusMetres: radiusMetres))
         let stored: Int = plan.vector.count + plan.terrain.count
         return (stored, stored < requested)
     }
@@ -210,7 +221,12 @@ final class MapPackStore {
     // MARK: - Adding ground
 
     /// Adds the ground along a route to the map.
-    func add(route: PlannedRoute, widened: Bool = false, sendToWatch: Bool = true) {
+    func add(
+        route: PlannedRoute,
+        widened: Bool = false,
+        detail: MapDownloadDetail = .topographic,
+        sendToWatch: Bool = true
+    ) {
         guard !progress.isBusy else { return }
         let coordinates = route.coordinates
         guard !coordinates.isEmpty else {
@@ -228,7 +244,7 @@ final class MapPackStore {
             routeID: route.id,
             centre: nil,
             radiusMetres: nil,
-            plan: MapPackPlanner.plan(for: coordinates, widened: widened),
+            plan: detail.trim(MapPackPlanner.plan(for: coordinates, widened: widened)),
             sendToWatch: sendToWatch
         )
 
@@ -244,6 +260,7 @@ final class MapPackStore {
         centre: CLLocationCoordinate2D,
         radiusMetres: Double,
         name: String,
+        detail: MapDownloadDetail = .topographic,
         sendToWatch: Bool = false
     ) {
         guard !progress.isBusy else { return }
@@ -256,7 +273,7 @@ final class MapPackStore {
             routeID: nil,
             centre: centre,
             radiusMetres: radiusMetres,
-            plan: MapPackPlanner.plan(around: centre, radiusMetres: radiusMetres),
+            plan: detail.trim(MapPackPlanner.plan(around: centre, radiusMetres: radiusMetres)),
             sendToWatch: sendToWatch
         )
 

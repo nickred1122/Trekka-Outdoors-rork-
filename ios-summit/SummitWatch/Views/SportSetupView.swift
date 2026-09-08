@@ -159,6 +159,33 @@ struct SportSetupView: View {
                 }
                 .tint(sport.tint)
             }
+
+            Section {
+                Picker(
+                    selection: Binding(
+                        get: { settings.quickAction },
+                        set: { settings.quickAction = $0 }
+                    )
+                ) {
+                    ForEach(WatchQuickAction.allCases) { action in
+                        Text(action.title).tag(action)
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Action button")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text(settings.quickAction.detail)
+                            .font(.system(size: 9))
+                            .foregroundStyle(WatchTheme.textSecondary)
+                    }
+                }
+            } footer: {
+                // Said plainly, because the obvious expectation is the side
+                // button and that one is not ours to take.
+                Text("A button on the workout screen. Double tap fires it on Series 9, Ultra 2 and later, and Ultra's Action button can be pointed at it in Shortcuts. The side button and Crown press belong to watchOS and cannot be reassigned.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(WatchTheme.textSecondary)
+            }
         }
         .navigationTitle(sport.title)
         .containerBackground(sport.tint.gradient, for: .navigation)

@@ -16,6 +16,15 @@ final class WorkoutEngine {
     enum Phase: Equatable {
         case idle
         case countdown(Int)
+        /// Between the tap and the first tick: the sensors are being brought up.
+        ///
+        /// Its own phase because it used to borrow `acquiring`, and `acquiring`
+        /// puts a "Waiting for a precise fix" screen up with Start now and Cancel
+        /// on it. With a countdown that window was hidden behind the numbers;
+        /// with the countdown turned off it flashed on screen for as long as the
+        /// sensors took to wake and then vanished into the workout — a menu
+        /// nobody asked for, gone before it could be read.
+        case arming
         /// Precise start: sensors are running but the clock has not, because the
         /// receiver has yet to produce a fix worth recording against.
         case acquiring
@@ -499,7 +508,11 @@ final class WorkoutEngine {
         onRecordingBegan?(sport)
 
         let countdown = max(0, settings?.countdownSeconds ?? 3)
-        phase = countdown > 0 ? .countdown(countdown) : .acquiring
+        // Never `.acquiring` up front: that screen is for a wait that is actually
+        // happening, and claiming to wait for a fix before the receiver has even
+        // been switched on is both untrue and, with no countdown in front of it,
+        // visible.
+        phase = countdown > 0 ? .countdown(countdown) : .arming
 
         Task { [weak self] in
             guard let self else { return }
@@ -510,6 +523,7 @@ final class WorkoutEngine {
                     try? await Task.sleep(for: .seconds(0.7))
                     guard case .countdown = phase else { return }
                 }
+                phase = .arming
             }
             await sensors.start(
                 sport: sport,
@@ -532,7 +546,7 @@ final class WorkoutEngine {
             await waitForTrustedFix(until: Date.now.addingTimeInterval(Fix.acquiringGrace))
 
             switch phase {
-            case .countdown, .acquiring: break
+            case .countdown, .arming, .acquiring: break
             default: return
             }
 
@@ -553,7 +567,7 @@ final class WorkoutEngine {
     private func waitForTrustedFix(until deadline: Date) async {
         while !hasTrustedFix, Date.now < deadline {
             switch phase {
-            case .countdown, .acquiring: break
+            case .countdown, .arming, .acquiring: break
             default: return
             }
             try? await Task.sleep(for: .milliseconds(100))
@@ -565,7 +579,7 @@ final class WorkoutEngine {
     private func beginRecording() {
         // Only a workout that has been armed but has not started yet can begin.
         switch phase {
-        case .countdown, .acquiring: break
+        case .countdown, .arming, .acquiring: break
         default: return
         }
 
@@ -1041,7 +1055,7 @@ final class WorkoutEngine {
         metrics.latitude = fix.latitude
         metrics.longitude = fix.longitude
         metrics.hasPosition = true
-        if startCoordinate == nil, phase == .active || phase == .acquiring {
+        if startCoordinate == nil, phase == .active || phase == .acquiring || phase == .arming {
             startCoordinate = fix.coordinate
         }
         if let startCoordinate {

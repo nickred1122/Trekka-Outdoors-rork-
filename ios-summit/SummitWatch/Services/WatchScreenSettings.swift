@@ -59,6 +59,9 @@ final class WatchScreenSettings {
             persist()
         }
     }
+    /// What the workout's action control does, on screen and through the double
+    /// tap gesture and AssistiveTouch.
+    var quickAction: WatchQuickAction = .pauseResume { didSet { persist() } }
     /// Starts every workout in power saver.
     var isPowerSaverEnabled: Bool = false { didSet { persist() } }
     /// Battery percentage that arms power saver mid-workout. 0 disables it.
@@ -301,6 +304,7 @@ final class WatchScreenSettings {
         metricWeight = payload.metricWeight.flatMap(MetricWeightChoice.init(rawValue:)) ?? metricWeight
         maxHeartRate = payload.maxHeartRate
         poolLengthMetres = payload.poolLengthMetres ?? poolLengthMetres
+        quickAction = payload.quickAction.flatMap(WatchQuickAction.init(rawValue:)) ?? quickAction
         unitSystem = payload.unitSystem.flatMap(UnitSystem.init(rawValue:)) ?? unitSystem
         massSystem = payload.massSystem.flatMap(UnitSystem.init(rawValue:)) ?? massSystem
         elevationSystem = payload.elevationSystem.flatMap(UnitSystem.init(rawValue:)) ?? elevationSystem
@@ -355,6 +359,7 @@ final class WatchScreenSettings {
         var fieldTint: String?
         var metricWeight: String?
         var poolLengthMetres: Double?
+        var quickAction: String?
     }
 
     private func load() {
@@ -384,6 +389,7 @@ final class WatchScreenSettings {
         metricWeight = payload.metricWeight.flatMap(MetricWeightChoice.init(rawValue:)) ?? .standard
         maxHeartRate = payload.maxHeartRate
         poolLengthMetres = payload.poolLengthMetres ?? 25
+        quickAction = payload.quickAction.flatMap(WatchQuickAction.init(rawValue:)) ?? .pauseResume
         unitSystem = payload.unitSystem.flatMap(UnitSystem.init(rawValue:)) ?? .deviceDefault
         massSystem = payload.massSystem.flatMap(UnitSystem.init(rawValue:)) ?? .deviceDefault
         elevationSystem = payload.elevationSystem.flatMap(UnitSystem.init(rawValue:)) ?? .deviceDefault
@@ -418,7 +424,8 @@ final class WatchScreenSettings {
             metricTypeface: metricTypeface.rawValue,
             fieldTint: fieldTint.rawValue,
             metricWeight: metricWeight.rawValue,
-            poolLengthMetres: poolLengthMetres
+            poolLengthMetres: poolLengthMetres,
+            quickAction: quickAction.rawValue
         )
         guard let data = try? JSONEncoder().encode(payload) else { return }
         UserDefaults.standard.set(data, forKey: defaultsKey)
