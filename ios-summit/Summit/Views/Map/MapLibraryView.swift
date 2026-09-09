@@ -34,17 +34,13 @@ struct MapLibraryView: View {
             VStack(spacing: 14) {
                 summaryCard
 
-                if mapPacks.progress.isBusy {
+                if mapPacks.isWorking {
                     progressCard
                 } else if case .failed(let message) = mapPacks.progress {
                     failureCard(message)
                 }
 
-                if !uncoveredRoutes.isEmpty {
-                    coverEverythingButton
-                }
-
-                areaDownloadButton
+                addSection
 
                 watchButton
 
@@ -134,22 +130,43 @@ struct MapLibraryView: View {
         return "\(placePart)\(routePart) · \(mapPacks.tileCount) pieces of ground, each stored once"
     }
 
+    /// What is downloading, and what is lined up behind it.
     private var progressCard: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if let name = mapPacks.activeName {
+                Text(name)
+                    .font(.system(.subheadline, weight: .bold))
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(1)
+            }
+
             Text(progressLabel)
-                .font(.system(.subheadline, weight: .semibold))
-                .foregroundStyle(Theme.textPrimary)
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundStyle(Theme.textPrimary.opacity(0.7))
+
             ProgressView(value: mapPacks.progress.fraction)
                 .tint(Theme.accent)
-            if let index = mapPacks.batchIndex, let total = mapPacks.batchTotal {
-                Text("Route \(index) of \(total)")
-                    .font(.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.textPrimary.opacity(0.55))
+
+            if !mapPacks.queuedNames.isEmpty {
+                Text("Then: \(mapPacks.queuedNames.joined(separator: " · "))")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.textPrimary.opacity(0.5))
+                    .lineLimit(2)
             }
-            Button("Stop") { mapPacks.cancel() }
-                .font(.caption)
-                .foregroundStyle(Theme.textPrimary.opacity(0.6))
+
+            Button(mapPacks.queuedNames.isEmpty ? "Stop" : "Stop everything") {
+                mapPacks.cancel()
+            }
+            .font(.system(.caption, weight: .semibold))
+            .foregroundStyle(Theme.textPrimary.opacity(0.6))
+
+            // A big download is worth being honest about: it takes as long as it
+            // takes, and leaving the screen does not stop it.
+            Text("Keep Trekka open while this runs. Anything already downloaded is kept if you stop.")
+                .font(.caption2)
+                .foregroundStyle(Theme.textPrimary.opacity(0.4))
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(14)
         .panel()
@@ -158,10 +175,12 @@ struct MapLibraryView: View {
     private var progressLabel: String {
         switch mapPacks.progress {
         case .planning: "Working out what is missing…"
-        case .downloading(let completed, let total): "Downloading \(completed) of \(total) new pieces"
+        case .downloading(let completed, let total):
+            "\(completed) of \(total) pieces · \(Int((Double(completed) / Double(max(total, 1))) * 100))%"
         case .writing: "Adding it to your map…"
         case .sendingToWatch: "Sending to your watch…"
-        default: "Working…"
+        case .ready, .alreadyCovered, .idle, .failed:
+            mapPacks.queuedNames.isEmpty ? "Working…" : "Starting the next one…"
         }
     }
 
@@ -184,6 +203,32 @@ struct MapLibraryView: View {
     }
 
     // MARK: - Actions
+
+    /// The two ways ground gets onto the map, in one block rather than loose
+    /// buttons stacked down the screen.
+    private var addSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Add ground")
+                .metricLabelStyle()
+                .padding(.leading, 4)
+
+            VStack(spacing: 0) {
+                areaDownloadButton
+                if !uncoveredRoutes.isEmpty {
+                    divider
+                    coverEverythingButton
+                }
+            }
+            .panel()
+
+            if mapPacks.isWorking {
+                Text("Downloads queue, so you can line up several places and leave it running.")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.textPrimary.opacity(0.45))
+                    .padding(.leading, 4)
+            }
+        }
+    }
 
     /// The one button that does what most people actually want: cover
     /// everywhere they go, in one go.
@@ -214,10 +259,9 @@ struct MapLibraryView: View {
                     .foregroundStyle(Theme.textPrimary.opacity(0.3))
             }
             .padding(12)
-            .panel()
+            .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .disabled(mapPacks.progress.isBusy)
     }
 
     private var coverEverythingDetail: String {
@@ -238,12 +282,13 @@ struct MapLibraryView: View {
                     .frame(width: 34, height: 34)
                     .background(Theme.surfaceRaised, in: .rect(cornerRadius: 10))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Add an area")
+                    Text("Add an area or a region")
                         .font(.system(.subheadline, weight: .semibold))
                         .foregroundStyle(Theme.textPrimary)
-                    Text("Draw a square of ground and keep it")
+                    Text("A valley at full detail, or a whole state at road-atlas scale")
                         .font(.caption)
                         .foregroundStyle(Theme.textPrimary.opacity(0.55))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")
@@ -251,10 +296,9 @@ struct MapLibraryView: View {
                     .foregroundStyle(Theme.textPrimary.opacity(0.3))
             }
             .padding(12)
-            .panel()
+            .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .disabled(mapPacks.progress.isBusy)
     }
 
     /// A way through to the watch's real contents.

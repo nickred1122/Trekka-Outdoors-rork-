@@ -134,10 +134,16 @@ final class PlaceSearchService {
     /// Clamped at both ends: a shop comes back with a region metres across, and
     /// a country comes back with one the size of a continent. Neither is a
     /// sensible square to open with.
+    ///
+    /// The ceiling is the *region* limit rather than the close-detail one on
+    /// purpose. Searching for a state used to hand back a radius silently cut to
+    /// 60 km, so the square opened over the middle of it and the athlete had no
+    /// way to know the answer had been trimmed. The picker decides what to do
+    /// with a large answer; the search's job is to report the real size.
     private static func radius(for item: MKMapItem) -> Double {
         let region = item.placemark.region as? CLCircularRegion
         let raw = region?.radius ?? 6_000
-        return min(max(raw, 2_000), AreaDownloadLimits.maxRadiusMetres)
+        return min(max(raw, 2_000), AreaDownloadLimits.maxRegionRadiusMetres)
     }
 }
 
@@ -150,4 +156,11 @@ nonisolated enum AreaDownloadLimits {
     /// 120 km across. Beyond this the planner has already dropped every zoom
     /// level that shows a path, so the download would be a coloured blur.
     static let maxRadiusMetres: Double = 60_000
+
+    /// The smallest a region download is worth being. Below this, close detail
+    /// covers the same ground and actually shows the paths.
+    static let minRegionRadiusMetres: Double = 20_000
+    /// 600 km across — larger than all but a handful of states, and the point
+    /// at which even road-atlas zoom levels stop fitting on a phone.
+    static let maxRegionRadiusMetres: Double = 300_000
 }

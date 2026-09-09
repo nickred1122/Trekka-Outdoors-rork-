@@ -186,9 +186,21 @@ final class TopoMapModel {
         return keys
     }
 
-    private func load(_ key: TopoTileKey) {
+    /// How many zoom levels the map will climb looking for ground it can draw.
+    ///
+    /// This is what makes a region download usable. A state is stored at the
+    /// levels a road atlas is drawn at, so leaning in asks for pieces that were
+    /// never downloaded, and the screen went blank at precisely the moment
+    /// somebody with no signal wanted to look closer — the map was on the phone
+    /// and simply not being asked for. Falling back to the piece that contains
+    /// it covers that gap. Each piece still draws at its own scale, so what
+    /// appears is a coarser map rather than a misplaced one.
+    private let coarseFallbackDepth = 3
+
+    private func load(_ key: TopoTileKey, fallbacksLeft: Int? = nil) {
         guard !inflight.contains(key) else { return }
         inflight.insert(key)
+        let remaining = fallbacksLeft ?? coarseFallbackDepth
 
         Task { [weak self] in
             let tile = await TopoTileSource.shared.vectorTile(key)
@@ -201,12 +213,21 @@ final class TopoMapModel {
                 self.store(geometry)
             }
             self.inflight.remove(key)
+
+            // Nil means the piece is genuinely unavailable: no signal, or a
+            // download that stops short of this zoom. An empty tile is a real
+            // answer — open sea, bare moor — and is left as it is.
+            guard tile == nil, remaining > 0, key.z > 0 else { return }
+            let parent = key.parent(atZoom: key.z - 1)
+            guard self.drawTiles[parent] == nil else { return }
+            self.load(parent, fallbacksLeft: remaining - 1)
         }
     }
 
-    private func loadContour(_ key: TopoTileKey) {
+    private func loadContour(_ key: TopoTileKey, fallbacksLeft: Int? = nil) {
         guard !contourInflight.contains(key) else { return }
         contourInflight.insert(key)
+        let remaining = fallbacksLeft ?? coarseFallbackDepth
 
         Task { [weak self] in
             let tile = await TopoTileSource.shared.contourTile(key)
@@ -219,6 +240,11 @@ final class TopoMapModel {
                 self.store(geometry)
             }
             self.contourInflight.remove(key)
+
+            guard tile == nil, remaining > 0, key.z > 0 else { return }
+            let parent = key.parent(atZoom: key.z - 1)
+            guard self.contourDrawTiles[parent] == nil else { return }
+            self.loadContour(parent, fallbacksLeft: remaining - 1)
         }
     }
 

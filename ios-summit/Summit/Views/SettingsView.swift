@@ -24,6 +24,7 @@ struct SettingsView: View {
     @Environment(ConsentSettings.self) private var consent
     @Environment(TabBarSettings.self) private var tabBar
     @Environment(StravaService.self) private var strava
+    @Environment(TrekkaChatService.self) private var chat
     @Binding var path: NavigationPath
 
     @State private var showsHealthSheet = false
@@ -82,6 +83,29 @@ struct SettingsView: View {
                         dashboard.resetToDefaults()
                         feedback += 1
                     }
+                }
+
+                section("Ask Trekka") {
+                    toggleRow(
+                        symbol: "bubble.left.and.sparkles.fill",
+                        title: "Show the chat bubble",
+                        detail: assistantDetail,
+                        isOn: Binding(
+                            get: { chat.isEnabled },
+                            set: { newValue in
+                                chat.isEnabled = newValue
+                                feedback += 1
+                            }
+                        )
+                    )
+
+                    Text("The bubble sits above the bottom bar and opens a conversation about your own training, answered on this iPhone. Turning it off hides it everywhere and clears the conversation.")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textPrimary.opacity(0.45))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 12)
                 }
 
                 section("Appearance") {
@@ -246,6 +270,20 @@ struct SettingsView: View {
     private func commitName() {
         profile.setName(draftName)
         draftName = profile.name
+    }
+
+    /// What the switch is actually controlling on *this* iPhone.
+    ///
+    /// Said plainly, because the bubble can be switched on and still not appear:
+    /// the assistant runs on Apple's on-device model, and a phone without it has
+    /// nothing to run. A hidden switch with no explanation would look broken.
+    private var assistantDetail: String {
+        guard chat.isEnabled else { return "Hidden" }
+        return switch chat.availability {
+        case .checking: "Checking whether this iPhone can run it…"
+        case .ready: "Shown on every screen with the bottom bar"
+        case let .unavailable(reason): reason
+        }
     }
 
     private var stravaDetail: String {
@@ -472,6 +510,40 @@ struct SettingsView: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
+    }
+
+    private func toggleRow(
+        symbol: String,
+        title: String,
+        detail: String,
+        tint: Color = Theme.accent,
+        isOn: Binding<Bool>
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 30, height: 30)
+                .background(tint.opacity(0.12), in: .rect(cornerRadius: 9))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(.subheadline, weight: .semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(Theme.textPrimary.opacity(0.5))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+
+            Toggle("", isOn: isOn)
+                .labelsHidden()
+                .tint(Theme.accent)
+        }
+        .padding(12)
+        .accessibilityElement(children: .combine)
     }
 
     private func appearanceOption(_ mode: AppearanceMode) -> some View {

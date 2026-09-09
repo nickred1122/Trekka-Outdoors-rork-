@@ -46,6 +46,15 @@ struct AreaDownloadView: View {
     /// somebody short of space can leave them out and halve the wait.
     @State private var detail: MapDownloadDetail = .topographic
 
+    /// How much ground one download covers.
+    ///
+    /// Close detail was the only option, capped at 120 km across, which made
+    /// "keep the state I am driving through" impossible: the square could not be
+    /// made big enough, and if it could have been, every zoom level worth having
+    /// would have been dropped to fit. Region is a different job with different
+    /// zoom levels, so it is a choice rather than a longer slider.
+    @State private var scale: MapDownloadScale = .close
+
     @State private var link = WatchLink.shared
 
     /// Drawing the square, rather than panning the ground under it.
@@ -73,7 +82,12 @@ struct AreaDownloadView: View {
 
     private var plan: (tileCount: Int, isReduced: Bool)? {
         guard let centre = cameraCentre else { return nil }
-        return MapPackStore.areaPlan(centre: centre, radiusMetres: radiusMetres, detail: detail)
+        return MapPackStore.areaPlan(
+            centre: centre,
+            radiusMetres: radiusMetres,
+            detail: detail,
+            scale: scale
+        )
     }
 
     var body: some View {
@@ -86,7 +100,7 @@ struct AreaDownloadView: View {
             }
             .overlay(alignment: .top) { searchResults }
         }
-        .navigationTitle("Download an area")
+        .navigationTitle(scale == .region ? "Download a region" : "Download an area")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
@@ -173,10 +187,7 @@ struct AreaDownloadView: View {
                             abs(Double(value.location.x) - centreX),
                             abs(Double(value.location.y) - centreY)
                         )
-                        radiusMetres = min(
-                            max(fromCentre * scale, AreaDownloadLimits.minRadiusMetres),
-                            AreaDownloadLimits.maxRadiusMetres
-                        )
+                        radiusMetres = self.scale.clamp(radiusMetres: fromCentre * scale)
                     }
                     .onEnded { _ in dragScale = nil }
             )
@@ -344,10 +355,14 @@ struct AreaDownloadView: View {
     /// word.
     private func choose(_ result: PlaceResult) {
         cameraCentre = result.centre
-        radiusMetres = min(
-            max(result.radiusMetres, AreaDownloadLimits.minRadiusMetres),
-            AreaDownloadLimits.maxRadiusMetres
-        )
+        // Searching for a state and being handed a square 120 km across in the
+        // middle of it is not an answer to what was asked. Something that big
+        // switches the screen to region scale, where it fits and where the zoom
+        // levels stored suit ground that size.
+        if result.radiusMetres > AreaDownloadLimits.maxRadiusMetres {
+            scale = .region
+        }
+        radiusMetres = scale.clamp(radiusMetres: result.radiusMetres)
         suggestedName = result.name
         searchToken += 1
         searchFocus = TopoFocus(
@@ -382,12 +397,14 @@ struct AreaDownloadView: View {
 
     private var controls: some View {
         VStack(spacing: 14) {
+            scalePicker
+
             sizeRow
 
             Slider(
                 value: $radiusMetres,
-                in: AreaDownloadLimits.minRadiusMetres...AreaDownloadLimits.maxRadiusMetres,
-                step: 500
+                in: scale.minRadiusMetres...scale.maxRadiusMetres,
+                step: scale.radiusStep
             )
             .tint(Theme.accent)
 
@@ -401,8 +418,12 @@ struct AreaDownloadView: View {
 
             detailPicker
 
+            if let limitNote = scale.limitNote {
+                note(limitNote)
+            }
+
             if let plan, plan.isReduced {
-                warning("This area is too large to keep at full detail, so the closest zoom levels are left out. The ground still draws, just less finely. A smaller area keeps everything.")
+                warning(reductionWarning)
             }
 
             watchToggle
@@ -411,6 +432,71 @@ struct AreaDownloadView: View {
         }
         .padding(16)
         .background(Theme.surface)
+    }
+
+    /// Which job this download is for.
+    private var scalePicker: some View {
+        HStack(spacing: 8) {
+            ForEach(MapDownloadScale.allCases) { option in
+                scaleOption(option)
+            }
+        }
+    }
+
+    private func scaleOption(_ option: MapDownloadScale) -> some View {
+        let isSelected = scale == option
+        return Button {
+            guard scale != option else { return }
+            scale = option
+            // The two scales have different sensible sizes, so the radius is
+            // brought inside the new range rather than left at a value the
+            // slider cannot represent.
+            radiusMetres = option.clamp(radiusMetres: radiusMetres)
+            if !option.allowsWatch { sendsToWatch = false }
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Image(systemName: option.symbol)
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(option.title)
+                        .font(.system(.subheadline, weight: .bold))
+                    Spacer(minLength: 0)
+                }
+                Text(option.detail)
+                    .font(.caption2)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(option.sizeNote)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(isSelected ? Theme.accent : Theme.textPrimary.opacity(0.4))
+            }
+            .foregroundStyle(isSelected ? Theme.textPrimary : Theme.textPrimary.opacity(0.6))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(Theme.surfaceRaised, in: .rect(cornerRadius: 11))
+            .overlay {
+                RoundedRectangle(cornerRadius: 11)
+                    .strokeBorder(
+                        isSelected ? Theme.accent.opacity(0.7) : Color.clear,
+                        lineWidth: 1.5
+                    )
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(option.title). \(option.detail). \(option.sizeNote).")
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    /// Said only when the ceiling actually bit, and worded for the scale that
+    /// hit it — the advice is different in each case.
+    private var reductionWarning: String {
+        switch scale {
+        case .close:
+            "This area is too large to keep at full detail, so the closest zoom levels are left out. The ground still draws, just less finely. A smaller area keeps everything."
+        case .region:
+            "This region is at the limit of what one download can hold, so the closest of its zoom levels are left out. It will look coarser than a smaller region. Two halves downloaded separately keep more."
+        }
     }
 
     private var sizeRow: some View {
@@ -510,7 +596,7 @@ struct AreaDownloadView: View {
 
     @ViewBuilder
     private var watchToggle: some View {
-        if link.isPaired, link.isWatchAppInstalled {
+        if scale.allowsWatch, link.isPaired, link.isWatchAppInstalled {
             Toggle(isOn: $sendsToWatch) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Send to Apple Watch")
@@ -533,6 +619,24 @@ struct AreaDownloadView: View {
             Text(text)
                 .font(.caption)
                 .foregroundStyle(Theme.textPrimary.opacity(0.7))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Theme.surfaceRaised, in: .rect(cornerRadius: 10))
+    }
+
+    /// What a scale genuinely cannot show. Not a warning — nothing is wrong —
+    /// but it has to be said before the download rather than discovered on a
+    /// hillside.
+    private func note(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "info.circle")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+            Text(text)
+                .font(.caption)
+                .foregroundStyle(Theme.textPrimary.opacity(0.7))
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)

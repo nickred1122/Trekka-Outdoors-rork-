@@ -2,6 +2,24 @@ import Foundation
 import Observation
 import CoreLocation
 
+/// Which of the two tile sources a batch is being fetched from.
+nonisolated enum MapTileFlavour: Sendable {
+    /// Paths, roads, water and woodland.
+    case vector
+    /// The height data contour lines are traced from.
+    case terrain
+}
+
+nonisolated extension Array {
+    /// Splits into runs of at most `size`, preserving order.
+    func chunked(into size: Int) -> [[Element]] {
+        guard size > 0, !isEmpty else { return isEmpty ? [] : [self] }
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0..<Swift.min($0 + size, count)])
+        }
+    }
+}
+
 /// Where a change to the offline map has got to.
 nonisolated enum MapPackProgress: Equatable, Sendable {
     case idle
@@ -61,9 +79,14 @@ final class MapPackStore {
     private(set) var progress: MapPackProgress = .idle
     /// The route currently being added, so its own card can show the bar.
     private(set) var activeRouteID: UUID?
-    /// Position in a "cover everything" run, when one is going.
-    private(set) var batchIndex: Int?
-    private(set) var batchTotal: Int?
+    /// What is being downloaded right now, by name.
+    private(set) var activeName: String?
+    /// Places lined up behind it, in order.
+    ///
+    /// Downloads used to be refused outright while another was running, which
+    /// made covering several places a chore of waiting and remembering. They now
+    /// queue: ask for four states and walk away.
+    private(set) var queuedNames: [String] = []
 
     /// Real size of the map on disk. Never an estimate.
     private(set) var totalBytes: Int = 0
@@ -82,6 +105,26 @@ final class MapPackStore {
 
     private var library: MapPackReader?
     private var task: Task<Void, Never>?
+    private var queue: [CoverageRequest] = []
+    /// Bumped whenever everything is stopped, so a run that is still unwinding
+    /// cannot start the next one after being cancelled.
+    private var generation = 0
+
+    /// How many tiles are fetched before what has arrived is written to disk.
+    ///
+    /// A region is thousands of pieces. Holding all of them in memory until the
+    /// end would be hundreds of megabytes of resident data — a plausible way to
+    /// be killed by the system halfway through — and would throw away everything
+    /// fetched if the download stopped. Writing as it goes fixes both.
+    private static let writeBatchSize = 320
+
+    /// How many tiles are fetched at once.
+    ///
+    /// One at a time meant a large download took its slowest tile times its tile
+    /// count: a state would have run for the better part of an hour. Six at a
+    /// time is several times quicker while staying polite to a community-run
+    /// tile server.
+    private static let fetchConcurrency = 6
 
     /// Reads map tiles for the renderer, on whatever thread it likes.
     private let bridge = MapPackBridge()
@@ -108,6 +151,9 @@ final class MapPackStore {
     }
 
     var isEmpty: Bool { coverage.isEmpty }
+
+    /// Whether anything is downloading or waiting to.
+    var isWorking: Bool { progress.isBusy || !queuedNames.isEmpty }
 
     /// Coverage the athlete asked for, newest first. Home areas are Trekka's
     /// own doing, so they are listed separately.
@@ -173,9 +219,10 @@ final class MapPackStore {
     func newTileCount(
         forArea centre: CLLocationCoordinate2D,
         radiusMetres: Double,
-        detail: MapDownloadDetail = .topographic
+        detail: MapDownloadDetail = .topographic,
+        scale: MapDownloadScale = .close
     ) -> Int {
-        newTileCount(in: detail.trim(MapPackPlanner.plan(around: centre, radiusMetres: radiusMetres)))
+        newTileCount(in: scale.plan(around: centre, radiusMetres: radiusMetres, detail: detail))
     }
 
     private func newTileCount(in plan: MapPackPlanner.Plan) -> Int {
@@ -201,19 +248,15 @@ final class MapPackStore {
     nonisolated static func areaPlan(
         centre: CLLocationCoordinate2D,
         radiusMetres: Double,
-        detail: MapDownloadDetail = .topographic
+        detail: MapDownloadDetail = .topographic,
+        scale: MapDownloadScale = .close
     ) -> (tileCount: Int, isReduced: Bool) {
-        var requested = 0
-        for zoom in MapPackPlanner.vectorZooms {
-            requested += MapPackPlanner.areaTiles(around: centre, radiusMetres: radiusMetres, zoom: zoom).count
-        }
-        if detail.includesTerrain {
-            for zoom in MapPackPlanner.terrainZooms {
-                requested += MapPackPlanner.areaTiles(around: centre, radiusMetres: radiusMetres, zoom: zoom).count
-            }
-        }
-
-        let plan = detail.trim(MapPackPlanner.plan(around: centre, radiusMetres: radiusMetres))
+        let requested = scale.requestedTileCount(
+            around: centre,
+            radiusMetres: radiusMetres,
+            detail: detail
+        )
+        let plan = scale.plan(around: centre, radiusMetres: radiusMetres, detail: detail)
         let stored: Int = plan.vector.count + plan.terrain.count
         return (stored, stored < requested)
     }
@@ -227,60 +270,52 @@ final class MapPackStore {
         detail: MapDownloadDetail = .topographic,
         sendToWatch: Bool = true
     ) {
-        guard !progress.isBusy else { return }
         let coordinates = route.coordinates
         guard !coordinates.isEmpty else {
             progress = .failed(MapPackError.noRoute.localizedDescription)
             return
         }
+        // Asking twice for the same route while it waits its turn should not
+        // queue it twice.
+        guard !queue.contains(where: { $0.routeID == route.id }),
+              activeRouteID != route.id else { return }
 
-        activeRouteID = route.id
-        progress = .planning
-
-        let request = CoverageRequest(
-            id: entry(forRoute: route.id)?.id ?? UUID(),
-            name: route.name,
-            kind: .route,
-            routeID: route.id,
-            centre: nil,
-            radiusMetres: nil,
-            plan: detail.trim(MapPackPlanner.plan(for: coordinates, widened: widened)),
-            sendToWatch: sendToWatch
+        enqueue(
+            CoverageRequest(
+                id: entry(forRoute: route.id)?.id ?? UUID(),
+                name: route.name,
+                kind: .route,
+                routeID: route.id,
+                centre: nil,
+                radiusMetres: nil,
+                plan: detail.trim(MapPackPlanner.plan(for: coordinates, widened: widened)),
+                sendToWatch: sendToWatch
+            )
         )
-
-        task = Task { [weak self] in
-            guard let self else { return }
-            await self.run(request)
-            self.activeRouteID = nil
-        }
     }
 
-    /// Adds a square of ground the athlete picked out themselves.
+    /// Adds a square of ground the athlete picked out themselves — a valley at
+    /// close detail, or a whole state at region scale.
     func addArea(
         centre: CLLocationCoordinate2D,
         radiusMetres: Double,
         name: String,
         detail: MapDownloadDetail = .topographic,
+        scale: MapDownloadScale = .close,
         sendToWatch: Bool = false
     ) {
-        guard !progress.isBusy else { return }
-        progress = .planning
-
-        let request = CoverageRequest(
-            id: UUID(),
-            name: name,
-            kind: .area,
-            routeID: nil,
-            centre: centre,
-            radiusMetres: radiusMetres,
-            plan: detail.trim(MapPackPlanner.plan(around: centre, radiusMetres: radiusMetres)),
-            sendToWatch: sendToWatch
+        enqueue(
+            CoverageRequest(
+                id: UUID(),
+                name: name,
+                kind: .area,
+                routeID: nil,
+                centre: centre,
+                radiusMetres: radiusMetres,
+                plan: scale.plan(around: centre, radiusMetres: radiusMetres, detail: detail),
+                sendToWatch: sendToWatch && scale.allowsWatch
+            )
         )
-
-        task = Task { [weak self] in
-            guard let self else { return }
-            await self.run(request)
-        }
     }
 
     /// Covers every route not already part of the map.
@@ -289,41 +324,54 @@ final class MapPackStore {
     /// shared, every route after the first only fetches ground the ones before
     /// it did not already bring in.
     func addAll(routes: [PlannedRoute], sendToWatch: Bool = false) {
-        guard !progress.isBusy else { return }
         let pending = routes.filter { !covers(routeID: $0.id) && !$0.coordinates.isEmpty }
         guard !pending.isEmpty else {
             progress = .alreadyCovered
             return
         }
 
-        progress = .planning
-        batchIndex = 1
-        batchTotal = pending.count
+        for route in pending {
+            add(route: route, sendToWatch: sendToWatch)
+        }
+    }
 
+    // MARK: - The queue
+
+    /// Lines a download up and starts it if nothing else is running.
+    private func enqueue(_ request: CoverageRequest) {
+        queue.append(request)
+        queuedNames = queue.map(\.name)
+        startNext()
+    }
+
+    private func startNext() {
+        guard task == nil, !queue.isEmpty else { return }
+
+        let request = queue.removeFirst()
+        queuedNames = queue.map(\.name)
+        activeRouteID = request.routeID
+        activeName = request.name
+        progress = .planning
+
+        let generation = self.generation
         task = Task { [weak self] in
             guard let self else { return }
-            for (offset, route) in pending.enumerated() {
-                if Task.isCancelled { break }
-                self.batchIndex = offset + 1
-                self.activeRouteID = route.id
-                await self.run(
-                    CoverageRequest(
-                        id: UUID(),
-                        name: route.name,
-                        kind: .route,
-                        routeID: route.id,
-                        centre: nil,
-                        radiusMetres: nil,
-                        plan: MapPackPlanner.plan(for: route.coordinates, widened: false),
-                        sendToWatch: sendToWatch
-                    )
-                )
-                if case .failed = self.progress { break }
-            }
+            await self.run(request)
+            // Everything was stopped while this was unwinding; the cancel has
+            // already cleared the queue and the state, so leave it alone.
+            guard self.generation == generation else { return }
             self.activeRouteID = nil
-            self.batchIndex = nil
-            self.batchTotal = nil
+            self.activeName = nil
+            self.task = nil
+            self.startNext()
         }
+    }
+
+    /// Drops a download that has not started yet.
+    func removeFromQueue(at index: Int) {
+        guard queue.indices.contains(index) else { return }
+        queue.remove(at: index)
+        queuedNames = queue.map(\.name)
     }
 
     /// Tops up the areas the athlete keeps setting off from.
@@ -331,7 +379,7 @@ final class MapPackStore {
     /// Deliberately unobtrusive: one area per call, never while another download
     /// is running, and never in front of something they actually asked for.
     func refreshHomeAreas(from activities: [ActivityRecord], limit: Int = 2) {
-        guard !progress.isBusy else { return }
+        guard !isWorking else { return }
 
         let areas = HomeAreaFinder.areas(from: activities).prefix(limit)
         for area in areas {
@@ -350,26 +398,24 @@ final class MapPackStore {
         name: String,
         radiusMetres: Double = 4_000
     ) {
-        guard !progress.isBusy else { return }
-        progress = .planning
+        // Trekka's own housekeeping never queues in front of something the
+        // athlete asked for, and never joins a queue either.
+        guard !isWorking else { return }
 
-        let request = CoverageRequest(
-            id: UUID(),
-            name: name,
-            kind: .home,
-            routeID: nil,
-            centre: centre,
-            radiusMetres: radiusMetres,
-            plan: MapPackPlanner.plan(around: centre, radiusMetres: radiusMetres),
-            // Starting areas stay on the phone. The watch's storage is better
-            // spent on the route actually being walked.
-            sendToWatch: false
+        enqueue(
+            CoverageRequest(
+                id: UUID(),
+                name: name,
+                kind: .home,
+                routeID: nil,
+                centre: centre,
+                radiusMetres: radiusMetres,
+                plan: MapPackPlanner.plan(around: centre, radiusMetres: radiusMetres),
+                // Starting areas stay on the phone. The watch's storage is
+                // better spent on the route actually being walked.
+                sendToWatch: false
+            )
         )
-
-        task = Task { [weak self] in
-            guard let self else { return }
-            await self.run(request)
-        }
     }
 
     private struct CoverageRequest {
@@ -407,45 +453,53 @@ final class MapPackStore {
             return
         }
 
-        var vectorData: [TopoTileKey: Data] = [:]
-        var terrainData: [TopoTileKey: Data] = [:]
         var completed = 0
+        var storedTiles = 0
         progress = .downloading(completed: 0, total: total)
 
-        do {
-            for key in missingVector {
-                try Task.checkCancellation()
-                if let data = try await TopoTileSource.shared.rawVectorTileData(key) {
-                    vectorData[key] = data
-                }
-                completed += 1
-                progress = .downloading(completed: completed, total: total)
-            }
+        // Fetched and written in batches rather than all at once: a region is
+        // thousands of pieces, and a download that has to finish before a single
+        // byte is saved is one that loses everything when it is interrupted.
+        let batches: [(flavour: MapTileFlavour, keys: [TopoTileKey])] =
+            missingVector.chunked(into: Self.writeBatchSize).map { (.vector, $0) }
+            + missingTerrain.chunked(into: Self.writeBatchSize).map { (.terrain, $0) }
 
-            for key in missingTerrain {
+        for batch in batches {
+            let alreadyDone = completed
+            do {
                 try Task.checkCancellation()
-                if let data = try await TopoTileSource.shared.rawTerrainTileData(key) {
-                    terrainData[key] = data
+                let fetched = try await fetch(batch.flavour, keys: batch.keys) { [weak self] arrived in
+                    self?.progress = .downloading(completed: alreadyDone + arrived, total: total)
                 }
-                completed += 1
+                completed = alreadyDone + batch.keys.count
                 progress = .downloading(completed: completed, total: total)
+
+                // A batch of open sea legitimately comes back with nothing.
+                guard !fetched.isEmpty else { continue }
+                try rebuild(
+                    addingVector: batch.flavour == .vector ? fetched : [:],
+                    addingTerrain: batch.flavour == .terrain ? fetched : [:]
+                )
+                storedTiles += fetched.count
+            } catch is CancellationError {
+                keepWhatArrived(request, storedTiles: storedTiles)
+                progress = .idle
+                return
+            } catch {
+                keepWhatArrived(request, storedTiles: storedTiles)
+                progress = .failed(error.localizedDescription)
+                EventLog.shared.failure(
+                    "Offline map",
+                    "Download of \(request.name) stopped after \(completed) of \(total) tiles",
+                    detail: error.localizedDescription
+                )
+                return
             }
-        } catch is CancellationError {
-            progress = .idle
-            return
-        } catch {
-            progress = .failed(error.localizedDescription)
-            EventLog.shared.failure(
-                "Offline map",
-                "Download of \(request.name) stopped after \(completed) of \(total) tiles",
-                detail: error.localizedDescription
-            )
-            return
         }
 
         // Every tile 404'd, which means the plan covered ground the sources do
         // not have rather than a download that failed.
-        guard !vectorData.isEmpty || !terrainData.isEmpty else {
+        guard storedTiles > 0 else {
             progress = .failed("No map data covers that area.")
             EventLog.shared.warning(
                 "Offline map",
@@ -456,33 +510,109 @@ final class MapPackStore {
         }
 
         progress = .writing
+        register(request)
+        // The renderer may be holding tiles fetched over the network for this
+        // ground; dropping them lets the stored map take over.
+        await TopoTileSource.shared.purge()
 
-        do {
-            try rebuild(addingVector: vectorData, addingTerrain: terrainData)
-            register(request)
-            // The renderer may be holding tiles fetched over the network for
-            // this ground; dropping them lets the stored map take over.
-            await TopoTileSource.shared.purge()
+        deliver(request)
+        if case .failed = progress { return }
 
-            deliver(request)
-            if case .failed = progress { return }
+        // Ready means the phone has it. Whether the watch has it is a separate
+        // question, answered by the watch itself.
+        progress = .ready
+        EventLog.shared.info(
+            "Offline map",
+            "Stored \(request.name)",
+            detail: "\(storedTiles) new pieces of ground, of \(total) planned."
+        )
+    }
 
-            // Ready means the phone has it. Whether the watch has it is a
-            // separate question, answered by the watch itself.
-            progress = .ready
-            EventLog.shared.info(
-                "Offline map",
-                "Stored \(request.name)",
-                detail: "\(vectorData.count) map tiles, \(terrainData.count) terrain tiles."
-            )
-        } catch {
-            progress = .failed(error.localizedDescription)
-            EventLog.shared.failure(
-                "Offline map",
-                "Could not save \(request.name) to disk",
-                detail: error.localizedDescription
-            )
+    /// Fetches a batch of tiles several at a time.
+    ///
+    /// `onArrival` is called with the running count so a long batch still moves
+    /// the bar, rather than jumping once at the end.
+    private func fetch(
+        _ flavour: MapTileFlavour,
+        keys: [TopoTileKey],
+        onArrival: @escaping (Int) -> Void
+    ) async throws -> [TopoTileKey: Data] {
+        guard !keys.isEmpty else { return [:] }
+        var result: [TopoTileKey: Data] = [:]
+        var arrived = 0
+
+        try await withThrowingTaskGroup(of: (TopoTileKey, Data?).self) { group in
+            var next = 0
+            // A fixed number in flight: the group is topped up as answers come
+            // back rather than being handed every tile at once, which would put
+            // thousands of requests on a community tile server in one breath.
+            while next < min(Self.fetchConcurrency, keys.count) {
+                group.addTask { [key = keys[next]] in
+                    (key, try await Self.download(flavour, key))
+                }
+                next += 1
+            }
+
+            while let (key, data) = try await group.next() {
+                if let data { result[key] = data }
+                arrived += 1
+                onArrival(arrived)
+
+                if next < keys.count {
+                    group.addTask { [key = keys[next]] in
+                        (key, try await Self.download(flavour, key))
+                    }
+                    next += 1
+                }
+            }
         }
+
+        return result
+    }
+
+    private nonisolated static func download(
+        _ flavour: MapTileFlavour,
+        _ key: TopoTileKey
+    ) async throws -> Data? {
+        switch flavour {
+        case .vector: try await TopoTileSource.shared.rawVectorTileData(key)
+        case .terrain: try await TopoTileSource.shared.rawTerrainTileData(key)
+        }
+    }
+
+    /// Keeps the ground a stopped download had already written.
+    ///
+    /// Bytes on disk are bytes nobody has to fetch again, so a region download
+    /// that was cancelled halfway is recorded for exactly what it holds. A route
+    /// is the one exception: it claims to be usable offline, and a half-covered
+    /// route making that claim is the single lie this feature cannot afford, so
+    /// its part-finished ground is given back instead.
+    private func keepWhatArrived(_ request: CoverageRequest, storedTiles: Int) {
+        guard storedTiles > 0 else { return }
+        guard request.kind != .route else {
+            compact()
+            return
+        }
+
+        let heldVector = request.plan.vector.filter {
+            holds(kind: MapPackFormat.vectorKind, key: $0)
+        }
+        let heldTerrain = request.plan.terrain.filter {
+            holds(kind: MapPackFormat.terrainKind, key: $0)
+        }
+        guard !heldVector.isEmpty || !heldTerrain.isEmpty else {
+            compact()
+            return
+        }
+
+        var partial = request
+        partial.plan = MapPackPlanner.Plan(vector: heldVector, terrain: heldTerrain)
+        register(partial)
+        EventLog.shared.info(
+            "Offline map",
+            "Kept the part of \(request.name) that had downloaded",
+            detail: "\(heldVector.count + heldTerrain.count) of \(request.plan.total) pieces stored."
+        )
     }
 
     /// Records what the map now covers.
@@ -525,12 +655,15 @@ final class MapPackStore {
         }
     }
 
+    /// Stops the download in progress and empties the queue behind it.
     func cancel() {
+        generation += 1
+        queue.removeAll()
+        queuedNames = []
         task?.cancel()
         task = nil
         activeRouteID = nil
-        batchIndex = nil
-        batchTotal = nil
+        activeName = nil
         progress = .idle
     }
 
